@@ -7159,7 +7159,7 @@
 				)
 			)
 		)
-		(property "Footprint" "LED_SMD:LED_0201_0603Metric"
+		(property "Footprint" "LED_SMD:LED_0603_1608Metric"
 			(at 154.94 87.63 0)
 			(effects
 				(font
@@ -7632,7 +7632,7 @@
 				)
 			)
 		)
-		(property "Footprint" "LED_SMD:LED_0201_0603Metric"
+		(property "Footprint" "LED_SMD:LED_0603_1608Metric"
 			(at 154.94 106.68 0)
 			(effects
 				(font
@@ -7778,7 +7778,7 @@
 				)
 			)
 		)
-		(property "Footprint" "LED_SMD:LED_0201_0603Metric"
+		(property "Footprint" "LED_SMD:LED_0603_1608Metric"
 			(at 154.94 96.52 0)
 			(effects
 				(font
@@ -11587,7 +11587,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "TestPoint"
+		(property "Value" "GND"
 			(at 40.64 187.9599 90)
 			(effects
 				(font
