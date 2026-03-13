@@ -6,8 +6,8 @@
 	(paper "A4")
 	(title_block
 		(title "ESP Click")
-		(date "2026-03-05")
-		(rev "1")
+		(date "2026-03-13")
+		(rev "2")
 		(company "Madhukar Temba")
 	)
 	(lib_symbols
@@ -9209,7 +9209,7 @@
 				)
 			)
 		)
-		(property "Value" "33R"
+		(property "Value" "100R"
 			(at 146.05 101.6 90)
 			(effects
 				(font
@@ -11733,76 +11733,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:R")
-		(at 147.32 68.58 180)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "e8bba341-26f2-4f16-a57a-fd8e77983d9a")
-		(property "Reference" "R4"
-			(at 149.86 67.3099 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Value" "10K"
-			(at 149.86 69.8499 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_0603_1608Metric"
-			(at 149.098 68.58 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 147.32 68.58 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 147.32 68.58 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "419066b8-abec-466d-b41d-ddb40acd4968")
-		)
-		(pin "2"
-			(uuid "882095ee-cd23-40f8-83eb-7694d281252c")
-		)
-		(instances
-			(project "esp_click_pcb"
-				(path "/342a49d9-6002-45d3-9ef6-1f04f7424998"
-					(reference "R4")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Regulator_Linear:HT75xx-1-SOT89")
 		(at 215.9 129.54 0)
 		(unit 1)
@@ -11869,72 +11799,6 @@
 			(project ""
 				(path "/342a49d9-6002-45d3-9ef6-1f04f7424998"
 					(reference "U2")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:+3.3V")
-		(at 147.32 64.77 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "eb4c9363-ebec-471d-8ff6-01c1fc3b76ed")
-		(property "Reference" "#PWR09"
-			(at 147.32 68.58 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "+3.3V"
-			(at 147.32 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 147.32 64.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 147.32 64.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
-			(at 147.32 64.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "2117eb57-300d-43bd-aac6-3e92c083a0af")
-		)
-		(instances
-			(project "esp_click_pcb"
-				(path "/342a49d9-6002-45d3-9ef6-1f04f7424998"
-					(reference "#PWR09")
 					(unit 1)
 				)
 			)
@@ -12228,7 +12092,7 @@
 				)
 			)
 		)
-		(property "Value" "33R"
+		(property "Value" "100R"
 			(at 146.05 92.71 90)
 			(effects
 				(font
