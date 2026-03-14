@@ -6,8 +6,8 @@
 	(paper "A4")
 	(title_block
 		(title "ESP Click")
-		(date "2026-03-13")
-		(rev "2")
+		(date "2026-03-14")
+		(rev "3")
 		(company "Madhukar Temba")
 	)
 	(lib_symbols
@@ -6053,7 +6053,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "1.5K"
+		(property "Value" "3K"
 			(at 109.22 184.1499 0)
 			(effects
 				(font
