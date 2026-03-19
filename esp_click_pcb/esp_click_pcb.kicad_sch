@@ -6,8 +6,8 @@
 	(paper "A4")
 	(title_block
 		(title "ESP Click")
-		(date "2026-03-14")
-		(rev "3")
+		(date "2026-03-19")
+		(rev "4")
 		(company "Madhukar Temba")
 	)
 	(lib_symbols
@@ -11066,19 +11066,21 @@
 		(fields_autoplaced yes)
 		(uuid "d4bed952-ba38-435b-bc0f-7b63f041f450")
 		(property "Reference" "C1"
-			(at 218.44 134.62 90)
+			(at 229.87 133.3499 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(justify left)
 			)
 		)
-		(property "Value" "22uF"
-			(at 220.98 134.62 90)
+		(property "Value" "100uF"
+			(at 229.87 135.8899 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(justify left)
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
