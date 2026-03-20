@@ -22,9 +22,12 @@ enum LedMode
 
 enum LedSpeed
 {
-    SLOW = 1000,
-    MEDIUM = 500,
-    FAST = 250
+    GLACIAL = 2000, // 2 seconds (Great for slow, sleepy breathing pulses)
+    SLOW = 1000,    // 1 second (Standard relaxed blink)
+    MEDIUM = 500,   // 0.5 seconds (Standard alert)
+    FAST = 250,     // 0.25 seconds (Urgent alert)
+    RAPID = 100,    // 0.1 seconds (Very urgent, fast flickering)
+    STROBE = 50     // 0.05 seconds (Aggressive strobe/flash effect)
 };
 
 struct LedCommand
@@ -55,7 +58,6 @@ private:
     int bPin;
     int pin;
     bool fadeBetweenCommands = true;
-    LedSpeed fadeOutSpeed = MEDIUM; // Duration of fade-out in milliseconds
     LedCommand pendingCmd;
     LedHardware hardwareType;
     LedType ledType;
@@ -232,7 +234,7 @@ private:
             // --- 3. EXECUTE ANIMATIONS & TRANSITIONS ---
             if (isFadingOut)
             {
-                float step = 20.0f / (float)fadeOutSpeed; // Calculate fade step based on desired fade-out duration
+                float step = 20.0f / (float)currentCmd.speed; // Calculate fade step based on desired fade-out duration
                 fadeOutLevel -= step;
 
                 if (fadeOutLevel <= 0.0f)

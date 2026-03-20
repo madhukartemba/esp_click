@@ -52,7 +52,7 @@ void loop()
       else if (i == 1)
       {
         // Button 1: Pulse Green Medium
-        myLed.set(PULSE, 1, GREEN);
+        myLed.set(PULSE, 10, GREEN, RAPID);
       }
       else if (i == 2)
       {
