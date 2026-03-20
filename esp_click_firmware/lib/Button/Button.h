@@ -1,3 +1,4 @@
+#pragma once
 #include <Arduino.h>
 
 enum ButtonState
@@ -8,7 +9,7 @@ enum ButtonState
     AWAITING_RELEASE
 };
 
-enum ButtonEvent
+enum PressEvent
 {
     NONE,
     SINGLE_PRESS,
@@ -23,7 +24,7 @@ private:
     uint8_t mode;
     bool flipped = false;
     ButtonState state = IDLE;
-    ButtonEvent event = NONE;
+    PressEvent event = NONE;
     unsigned long pressTimer = 0;
 
     unsigned long longPressDuration = 1000; // Duration to consider a long press (in milliseconds)
@@ -98,9 +99,9 @@ public:
         return event != NONE;
     }
 
-    ButtonEvent getEvent()
+    PressEvent getEvent()
     {
-        ButtonEvent currentEvent = event;
+        PressEvent currentEvent = event;
         event = NONE;
 
         Serial.print("getEvent called, returning: ");
@@ -135,5 +136,10 @@ public:
     void setFlipped(bool isFlipped)
     {
         flipped = isFlipped;
+    }
+
+    int getPin()
+    {
+        return pin;
     }
 };

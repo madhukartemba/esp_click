@@ -1,36 +1,54 @@
 #include <Arduino.h>
 #include "AsyncLed.h"
 #include "Button.h"
+#include "ButtonManager.h"
 
-// 1. Create the LED instance (Using your ESP32-C6 pins and Common Anode)
 AsyncLed myLed(21, 22, 23, COMMON_ANODE);
-Button button(0, INPUT, true);
+
+Button button1(0, INPUT, true);
+Button button2(1, INPUT, true);
+Button button3(2, INPUT, true);
+Button button4(3, INPUT, true);
+
+ButtonManager buttonManger;
+
+QueueHandle_t buttonQueue;
+ButtonEvent event;
 
 void setup()
 {
   Serial.begin(9600);
   myLed.begin();
+
+  buttonManger.registerButton(&button1);
+  buttonManger.registerButton(&button2);
+  buttonManger.registerButton(&button3);
+  buttonManger.registerButton(&button4);
+
+  buttonManger.begin();
+  buttonQueue = buttonManger.getQueue();
 }
 
 void loop()
 {
-  button.update();
-  if (button.hasEvent())
+  if (xQueueReceive(buttonQueue, &event, portMAX_DELAY))
   {
-    switch (button.getEvent())
+    switch (event.event)
     {
     case SINGLE_PRESS:
-      myLed.set(PULSE, 1, RED);
+      Serial.printf("Button %d Single Press\n", event.id);
+      myLed.set(PULSE, 1, WHITE);
       break;
     case DOUBLE_PRESS:
-      myLed.set(PULSE, 2, GREEN);
+      Serial.printf("Button %d Double Press\n", event.id);
+      myLed.set(PULSE, 1, GREEN);
       break;
     case LONG_PRESS:
-      myLed.set(PULSE, 3, WHITE);
+      Serial.printf("Button %d Long Press\n", event.id);
+      myLed.set(PULSE, 1, BLUE);
       break;
     default:
       break;
     }
-    delay(25);
   }
 }
