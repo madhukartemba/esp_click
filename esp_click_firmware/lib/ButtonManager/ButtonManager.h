@@ -23,13 +23,16 @@ private:
 
     void run()
     {
-        for (Button *button : buttons)
+        while (true)
         {
-            button->update();
-            if (button->hasEvent())
+            for (Button *button : buttons)
             {
-                ButtonEvent event = {.id = button->getPin(), .event = button->getEvent()};
-                xQueueSend(buttonEventQueue, &event, 0);
+                button->update();
+                if (button->hasEvent())
+                {
+                    ButtonEvent event = {.id = button->getPin(), .event = button->getEvent()};
+                    xQueueSend(buttonEventQueue, &event, 0);
+                }
             }
         }
     }
