@@ -32,6 +32,7 @@ struct LedCommand
     LedMode mode;
     Color color;
     LedSpeed speed = MEDIUM;
+    int count = -1;
 };
 
 enum LedHardware
@@ -144,7 +145,8 @@ private:
     // --- The Main Task Loop ---
     void run()
     {
-        LedCommand currentCmd = {OFF, BLACK, MEDIUM};
+        LedCommand currentCmd = {OFF, BLACK, MEDIUM, -1};
+        int currentCount = -1; // Tracks remaining cycles (-1 = infinite)
 
         // Animation state variables
         bool blinkState = false;
@@ -179,7 +181,10 @@ private:
                 if (xQueueReceive(commandQueue, &tempCmd, waitTime) == pdTRUE)
                 {
                     // Ignore the command if it's exactly what we are already doing
-                    if (!(tempCmd.mode == currentCmd.mode && tempCmd.color == currentCmd.color && tempCmd.speed == currentCmd.speed))
+                    if (!(tempCmd.mode == currentCmd.mode &&
+                          tempCmd.color == currentCmd.color &&
+                          tempCmd.speed == currentCmd.speed &&
+                          tempCmd.count == currentCmd.count)) // Duplicate check includes the count
                     {
                         gotNewCmd = true;
                     }
@@ -209,6 +214,7 @@ private:
                 {
                     // If the LED is already black (or OFF), instantly swap to the new command
                     currentCmd = tempCmd;
+                    currentCount = currentCmd.count; // Capture the count
                     blinkState = false;
                     pulseLevel = 0.0f;
                     pulseIncreasing = true;
@@ -238,8 +244,10 @@ private:
 
                 if (fadeOutLevel <= 0.0f)
                 {
+                    // Fade out complete! Swap to the pending command
                     isFadingOut = false;
                     currentCmd = pendingCmd;
+                    currentCount = currentCmd.count; // Capture the count from pending
                     blinkState = false;
                     pulseLevel = 0.0f;
                     pulseIncreasing = true;
@@ -282,36 +290,62 @@ private:
                     lastActionTime = currentMillis;
                     blinkState = !blinkState;
                     setHardwareColor(blinkState ? targetR : 0, blinkState ? targetG : 0, blinkState ? targetB : 0);
+
+                    // If it just turned OFF, a full blink cycle is complete!
+                    if (!blinkState && currentCount > 0)
+                    {
+                        currentCount--;
+                        if (currentCount == 0)
+                        {
+                            currentCmd.mode = OFF; // Finished!
+                        }
+                    }
                 }
             }
             else if (currentCmd.mode == PULSE)
             {
                 float step = 20.0f / (float)currentCmd.speed;
 
+                // End of a pulse cycle (hit the bottom)
                 if (pulseLevel <= 0.0f && !pulseIncreasing)
                 {
-                    pulseIncreasing = true;
-                }
-
-                if (pulseIncreasing)
-                {
-                    pulseLevel += step;
-                    if (pulseLevel >= 1.0f)
+                    if (currentCount > 0)
                     {
-                        pulseLevel = 1.0f;
-                        pulseIncreasing = false;
+                        currentCount--;
+                        if (currentCount == 0)
+                        {
+                            currentCmd.mode = OFF; // Finished!
+                        }
                     }
-                }
-                else
-                {
-                    pulseLevel -= step;
-                    if (pulseLevel <= 0.0f)
+
+                    // Only bounce back up if we didn't just turn off
+                    if (currentCmd.mode != OFF)
                     {
-                        pulseLevel = 0.0f;
+                        pulseIncreasing = true;
                     }
                 }
 
-                setHardwareColor(targetR * pulseLevel, targetG * pulseLevel, targetB * pulseLevel);
+                if (currentCmd.mode == PULSE) // Still pulsing
+                {
+                    if (pulseIncreasing)
+                    {
+                        pulseLevel += step;
+                        if (pulseLevel >= 1.0f)
+                        {
+                            pulseLevel = 1.0f;
+                            pulseIncreasing = false;
+                        }
+                    }
+                    else
+                    {
+                        pulseLevel -= step;
+                        if (pulseLevel <= 0.0f)
+                        {
+                            pulseLevel = 0.0f;
+                        }
+                    }
+                    setHardwareColor(targetR * pulseLevel, targetG * pulseLevel, targetB * pulseLevel);
+                }
             }
         }
     }
@@ -361,6 +395,13 @@ public:
     void set(LedMode mode)
     {
         LedCommand cmd = {mode, WHITE, MEDIUM};
+        xQueueSend(commandQueue, &cmd, 0);
+    }
+
+    // 4. Counted Control: Blink or Pulse X times!
+    void set(LedMode mode, int count, Color color, LedSpeed speed = MEDIUM)
+    {
+        LedCommand cmd = {mode, color, speed, count};
         xQueueSend(commandQueue, &cmd, 0);
     }
 };
