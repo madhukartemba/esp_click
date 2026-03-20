@@ -180,14 +180,7 @@ private:
                 // Check the queue. If no command arrives, this will timeout and act as our 20ms frame delay!
                 if (xQueueReceive(commandQueue, &tempCmd, waitTime) == pdTRUE)
                 {
-                    // Ignore the command if it's exactly what we are already doing
-                    if (!(tempCmd.mode == currentCmd.mode &&
-                          tempCmd.color == currentCmd.color &&
-                          tempCmd.speed == currentCmd.speed &&
-                          tempCmd.count == currentCmd.count)) // Duplicate check includes the count
-                    {
-                        gotNewCmd = true;
-                    }
+                    gotNewCmd = true;
                 }
             }
 
