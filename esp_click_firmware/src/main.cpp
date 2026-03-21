@@ -3,6 +3,7 @@
 #include "BatteryMonitor.h"
 #include "Button.h"
 #include "ButtonManager.h"
+#include "SleepManager.h"
 
 #define VOLTAGE_DIVIDER_RATIO (910.0f / 1380.0f)
 
@@ -23,6 +24,8 @@ ButtonEvent event;
 void setup()
 {
   Serial.begin(9600);
+  SleepManager::getInstance().begin();
+
   myLed.begin();
 
   batteryMonitor.setVoltageDividerRatio(VOLTAGE_DIVIDER_RATIO);

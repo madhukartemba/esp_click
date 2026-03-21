@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include "Button.h"
+#include "SleepManager.h"
 
 struct ButtonEvent
 {
@@ -14,6 +15,8 @@ private:
     int buttonCount = 0;
     std::vector<Button *> buttons;
     QueueHandle_t buttonEventQueue;
+
+    EventBits_t taskId;
 
     static void buttonTask(void *pvParameters)
     {
@@ -42,12 +45,26 @@ public:
     void begin()
     {
         buttonEventQueue = xQueueCreate(10, sizeof(ButtonEvent));
+        taskId = SleepManager::getInstance().registerTask();
         xTaskCreate(ButtonManager::buttonTask, "Button Manager", 2048, this, 1, NULL);
     }
 
     void registerButton(Button *button)
     {
         buttons.push_back(button);
+
+        button->registerStateChangeCallback(
+            [this](ButtonState state)
+            {
+                if (state != IDLE)
+                {
+                    SleepManager::getInstance().keepAwake(this->taskId);
+                }
+                else
+                {
+                    SleepManager::getInstance().allowSleep(this->taskId);
+                }
+            });
     }
 
     QueueHandle_t getQueue()

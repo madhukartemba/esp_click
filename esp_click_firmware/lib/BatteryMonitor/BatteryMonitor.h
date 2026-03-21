@@ -28,7 +28,7 @@ private:
     float batteryVoltageRangeMin = 3.0f;
     float batteryVoltageRangeMax = 4.15f;
 
-    void (*batteryStatusChangeCallback)(BatteryStatus) = nullptr;
+    std::function<void(BatteryStatus)> batteryStatusChangeCallback = nullptr;
 
     static void monitorTask(void *pvParameters)
     {
@@ -145,7 +145,7 @@ public:
         xTaskCreate(BatteryMonitor::monitorTask, "Battery Monitor", 2048, this, 1, NULL);
     }
 
-    void onBatteryStatusChange(void (*callback)(BatteryStatus))
+    void onBatteryStatusChange(std::function<void(BatteryStatus)> callback)
     {
         batteryStatusChangeCallback = callback;
     }

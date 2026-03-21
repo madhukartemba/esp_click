@@ -22,11 +22,14 @@ class Button : public DigitalInput
 {
 private:
     ButtonState state = IDLE;
+    ButtonState previousState = IDLE;
     PressEvent event = NONE;
 
     unsigned long pressTimer = 0;
     unsigned long longPressDuration = 1000; // Duration to consider a long press (in milliseconds)
     unsigned long doublePressGap = 250;     // Max gap between presses for a double press (in milliseconds)
+
+    std::function<void(ButtonState)> stateChangeCallback;
 
     bool isButtonPressed()
     {
@@ -89,6 +92,15 @@ public:
         default:
             break;
         };
+
+        if (state != previousState)
+        {
+            previousState = state;
+            if (stateChangeCallback)
+            {
+                stateChangeCallback(state);
+            }
+        }
     }
 
     bool hasEvent()
@@ -128,5 +140,10 @@ public:
     void setDoublePressGap(unsigned long gap)
     {
         doublePressGap = gap;
+    }
+
+    void registerStateChangeCallback(std::function<void(ButtonState)> callback)
+    {
+        stateChangeCallback = callback;
     }
 };
