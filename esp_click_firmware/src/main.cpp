@@ -1,9 +1,14 @@
 #include <Arduino.h>
 #include "AsyncLed.h"
+#include "BatteryMonitor.h"
 #include "Button.h"
 #include "ButtonManager.h"
 
+#define VOLTAGE_DIVIDER_RATIO (470.0f / 910.0f)
+
 AsyncLed myLed(21, 22, 23, COMMON_ANODE);
+
+BatteryMonitor batteryMonitor(6, 4, 5);
 
 Button button1(0, INPUT, true);
 Button button2(1, INPUT, true);
@@ -19,6 +24,9 @@ void setup()
 {
   Serial.begin(9600);
   myLed.begin();
+
+  batteryMonitor.setVoltageDividerRatio(VOLTAGE_DIVIDER_RATIO);
+  batteryMonitor.begin();
 
   buttonManger.registerButton(&button1);
   buttonManger.registerButton(&button2);
