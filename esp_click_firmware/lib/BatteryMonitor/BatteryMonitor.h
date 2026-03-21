@@ -63,7 +63,6 @@ private:
         {
             float voltage = getBatteryVoltage();
             calculateBatteryLevel(voltage);
-            Serial.printf("Battery Voltage: %.2f V, Level: %d%%\n", voltage, batteryLevel);
 
             if (voltage < 2.4f)
             {
@@ -102,6 +101,8 @@ private:
             {
                 status = CHARGE_FAULT;
             }
+
+            Serial.printf("Battery Voltage: %.2f V, Level: %d%%, Status: %d \n", voltage, batteryLevel, status);
 
             if (previousStatus != status)
             {
