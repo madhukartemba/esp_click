@@ -64,7 +64,7 @@ private:
             float voltage = getBatteryVoltage();
             calculateBatteryLevel(voltage);
 
-            if (voltage < 2.4f)
+            if (voltage < batteryPresenceVoltageThreshold)
             {
                 status = NOT_CONNECTED;
                 batteryLevel = 0;
