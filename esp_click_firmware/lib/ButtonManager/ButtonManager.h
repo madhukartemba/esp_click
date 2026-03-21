@@ -53,6 +53,8 @@ public:
     {
         buttons.push_back(button);
 
+        SleepManager::getInstance().registerWakeupPin(button->getPin());
+
         button->registerStateChangeCallback(
             [this](ButtonState state)
             {
