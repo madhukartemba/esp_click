@@ -34,6 +34,7 @@ private:
                     xQueueSend(buttonEventQueue, &event, 0);
                 }
             }
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
     }
 
