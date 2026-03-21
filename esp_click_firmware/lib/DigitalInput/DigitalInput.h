@@ -14,7 +14,7 @@ public:
         pinMode(pin, mode);
     }
 
-    bool isActive()
+    bool isActive() const
     {
         return digitalRead(pin) != flipped;
     }
@@ -24,7 +24,7 @@ public:
         this->flipped = flipped;
     }
 
-    int getPin()
+    int getPin() const
     {
         return pin;
     }
