@@ -112,23 +112,6 @@ public:
     {
         PressEvent currentEvent = event;
         event = NONE;
-
-        Serial.print("getEvent called, returning: ");
-        switch (currentEvent)
-        {
-        case SINGLE_PRESS:
-            Serial.println("SINGLE_PRESS");
-            break;
-        case DOUBLE_PRESS:
-            Serial.println("DOUBLE_PRESS");
-            break;
-        case LONG_PRESS:
-            Serial.println("LONG_PRESS");
-            break;
-        default:
-            Serial.println("NONE");
-            break;
-        }
         return currentEvent;
     }
 
