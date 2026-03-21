@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include "IOPin.h"
 
 class AnalogInput : public IOPin
 {
