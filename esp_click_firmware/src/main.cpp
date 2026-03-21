@@ -4,7 +4,7 @@
 #include "Button.h"
 #include "ButtonManager.h"
 
-#define VOLTAGE_DIVIDER_RATIO (470.0f / 910.0f)
+#define VOLTAGE_DIVIDER_RATIO (910.0f / 1380.0f)
 
 AsyncLed myLed(21, 22, 23, COMMON_ANODE);
 

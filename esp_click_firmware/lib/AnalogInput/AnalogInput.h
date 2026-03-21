@@ -17,8 +17,8 @@ public:
         return pin;
     }
 
-    int getReading() const
+    int getReadingMilliVolts() const
     {
-        return analogRead(pin);
+        return analogReadMilliVolts(pin);
     }
 };

@@ -26,7 +26,7 @@ private:
     float batteryPresenceVoltageThreshold = 2.4f;
     float batteryFullyChargedVoltageThreshold = 4.0f;
     float batteryVoltageRangeMin = 3.0f;
-    float batteryVoltageRangeMax = 4.2f;
+    float batteryVoltageRangeMax = 4.15f;
 
     void (*batteryStatusChangeCallback)(BatteryStatus) = nullptr;
 
@@ -38,9 +38,8 @@ private:
 
     float getBatteryVoltage()
     {
-        int adcValue = batteryAdcInput->getReading();
-        float voltage = (adcValue / 4095.0f) * 3.3f * voltageDividerRatio;
-        return voltage;
+        int rawMilliVolts = batteryAdcInput->getReadingMilliVolts();
+        return (rawMilliVolts / 1000.0f) / voltageDividerRatio;
     }
 
     void calculateBatteryLevel()
@@ -64,6 +63,7 @@ private:
         {
             float voltage = getBatteryVoltage();
             calculateBatteryLevel(voltage);
+            Serial.printf("Battery Voltage: %.2f V, Level: %d%%\n", voltage, batteryLevel);
 
             if (voltage < 2.4f)
             {
@@ -112,7 +112,7 @@ private:
                 previousStatus = status;
             }
 
-            vTaskDelay(pdMS_TO_TICKS(500));
+            vTaskDelay(pdMS_TO_TICKS(3000));
         }
     }
 
@@ -125,7 +125,6 @@ public:
 
         // Instantly read the battery level and status on startup
         calculateBatteryLevel();
-        run();
     }
 
     void setVoltageDividerRatio(float ratio)
