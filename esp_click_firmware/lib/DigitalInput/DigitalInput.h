@@ -1,22 +1,22 @@
 #pragma once
 #include <Arduino.h>
+#include "IOPin.h"
 
-class DigitalInput
+class DigitalInput : public IOPin
 {
 private:
-    int pin;
     uint8_t mode;
     bool flipped = false;
 
 public:
-    DigitalInput(int pin, uint8_t mode, bool flipped = false) : pin(pin), mode(mode), flipped(flipped)
+    DigitalInput(int pin, uint8_t mode, bool flipped = false) : IOPin(pin), mode(mode), flipped(flipped)
     {
         pinMode(pin, mode);
     }
 
     bool isActive() const
     {
-        return digitalRead(pin) != flipped;
+        return digitalRead(getPin()) != flipped;
     }
 
     void setFlipped(bool flipped)
@@ -26,6 +26,6 @@ public:
 
     int getPin() const
     {
-        return pin;
+        return IOPin::getPin();
     }
 };

@@ -1,24 +1,22 @@
 #pragma once
 #include <Arduino.h>
 
-class AnalogInput
+class AnalogInput : public IOPin
 {
-private:
-    int pin;
 
 public:
-    AnalogInput(int pin) : pin(pin)
+    AnalogInput(int pin) : IOPin(pin)
     {
-        pinMode(pin, INPUT);
+        pinMode(getPin(), INPUT);
     }
 
     int getPin() const
     {
-        return pin;
+        return IOPin::getPin();
     }
 
     int getReadingMilliVolts() const
     {
-        return analogReadMilliVolts(pin);
+        return analogReadMilliVolts(getPin());
     }
 };
