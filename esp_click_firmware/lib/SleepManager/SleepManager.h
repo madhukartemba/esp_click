@@ -8,6 +8,8 @@ private:
 
     int eventCount = 0;
 
+    unsigned long lastActivityTime = 0;
+
     SleepManager() {}
 
 public:
@@ -42,6 +44,8 @@ public:
 
         eventCount++;
 
+        Serial.println("Task registered with sleep manager, assigned bit: " + String(assignedBit, BIN) + " (Event count: " + String(eventCount) + ")");
+
         return assignedBit;
     }
 
@@ -53,5 +57,11 @@ public:
     void allowSleep(EventBits_t taskId)
     {
         xEventGroupClearBits(sleepEventGroup, taskId);
+        lastActivityTime = millis();
+    }
+
+    void reportActivity()
+    {
+        lastActivityTime = millis();
     }
 };
