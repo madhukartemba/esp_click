@@ -351,21 +351,8 @@ public:
 
     void begin()
     {
-        if (ledType == RGB)
-        {
-            pinMode(rPin, OUTPUT);
-            pinMode(gPin, OUTPUT);
-            pinMode(bPin, OUTPUT);
-        }
-        else
-        {
-            pinMode(pin, OUTPUT);
-        }
 
         commandQueue = xQueueCreate(10, sizeof(LedCommand));
-
-        // Turn off initially (ensures Common Anode starts properly)
-        setHardwareColor(0, 0, 0);
 
         xTaskCreate(AsyncLed::ledTask, "LED Task", 2048, this, 1, NULL);
     }
