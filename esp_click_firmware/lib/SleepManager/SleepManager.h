@@ -13,6 +13,8 @@ private:
 
     unsigned long lastActivityTime = 0;
 
+    uint64_t wakeupPins = 0ULL;
+
     SleepManager() {}
 
     static void sleepTask(void *pvParameters)
@@ -34,9 +36,13 @@ private:
 
             if (idleTime >= sleepTimeout)
             {
-                // Simulate sleep
-                Serial.println("Going into deep sleep");
-                vTaskDelay(pdMS_TO_TICKS(1000000));
+                // Enable wake on the registered pins
+                if (wakeupPins > 0)
+                {
+                    esp_sleep_enable_ext1_wakeup(wakeupPins, ESP_EXT1_WAKEUP_ANY_LOW);
+                }
+                Serial.println("Entering deep sleep...");
+                esp_deep_sleep_start();
             }
             else
             {
@@ -106,5 +112,10 @@ public:
     void setSleepTimeout(unsigned long timeoutMs)
     {
         sleepTimeout = timeoutMs;
+    }
+
+    void registerWakeupPin(int pin)
+    {
+        wakeupPins |= (1ULL << pin);
     }
 };
