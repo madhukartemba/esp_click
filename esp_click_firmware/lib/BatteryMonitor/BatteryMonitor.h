@@ -123,9 +123,6 @@ public:
         batteryAdcInput = new AnalogInput(adcPin);
         powerGoodInput = new DigitalInput(pgoodPin, INPUT, true);
         chargeInput = new DigitalInput(chgPin, INPUT, true);
-
-        // Instantly read the battery level and status on startup
-        calculateBatteryLevel();
     }
 
     void setVoltageDividerRatio(float ratio)
