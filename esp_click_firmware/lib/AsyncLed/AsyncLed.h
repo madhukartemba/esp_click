@@ -351,7 +351,6 @@ public:
 
     void begin()
     {
-
         commandQueue = xQueueCreate(10, sizeof(LedCommand));
 
         xTaskCreate(AsyncLed::ledTask, "LED Task", 2048, this, 1, NULL);
