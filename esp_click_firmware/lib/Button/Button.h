@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include "DigitalInput.h"
 
 enum ButtonState
 {
@@ -17,28 +18,24 @@ enum PressEvent
     LONG_PRESS,
 };
 
-class Button
+class Button : public DigitalInput
 {
 private:
-    int pin;
-    uint8_t mode;
-    bool flipped = false;
     ButtonState state = IDLE;
     PressEvent event = NONE;
-    unsigned long pressTimer = 0;
 
+    unsigned long pressTimer = 0;
     unsigned long longPressDuration = 1000; // Duration to consider a long press (in milliseconds)
     unsigned long doublePressGap = 250;     // Max gap between presses for a double press (in milliseconds)
 
     bool isButtonPressed()
     {
-        return digitalRead(pin) != flipped;
+        return isActive();
     }
 
 public:
-    Button(int pin, uint8_t mode, bool flipped = false) : pin(pin), mode(mode), flipped(flipped)
+    Button(int pin, uint8_t mode, bool flipped = false) : DigitalInput(pin, mode, flipped)
     {
-        pinMode(pin, mode);
     }
 
     void update()
@@ -131,15 +128,5 @@ public:
     void setDoublePressGap(unsigned long gap)
     {
         doublePressGap = gap;
-    }
-
-    void setFlipped(bool isFlipped)
-    {
-        flipped = isFlipped;
-    }
-
-    int getPin()
-    {
-        return pin;
     }
 };
