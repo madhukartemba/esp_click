@@ -44,7 +44,6 @@ private:
 
     static void controllerTask(void *pvParameters)
     {
-        // Cast the parameters back to the class instance
         EspNowController *instance = (EspNowController *)pvParameters;
         instance->run();
     }
