@@ -214,9 +214,9 @@ public:
     EspNowController(const EspNowController &) = delete;
     EspNowController &operator=(const EspNowController &) = delete;
 
-    void begin(QueueHandle_t messageQueue)
+    void begin()
     {
-        this->messageQueue = messageQueue;
+        this->messageQueue = xQueueCreate(10, sizeof(Message));
         this->taskId = SleepManager::getInstance().registerTask();
 
         xTaskCreate(EspNowController::controllerTask, "ESP-NOW Task", 2048, this, 1, NULL);

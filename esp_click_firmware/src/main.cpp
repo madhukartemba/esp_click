@@ -4,6 +4,7 @@
 #include "Button.h"
 #include "ButtonManager.h"
 #include "SleepManager.h"
+#include "EspNowController.h"
 
 #define VOLTAGE_DIVIDER_RATIO (910.0f / 1380.0f)
 
@@ -31,6 +32,8 @@ void setup()
   batteryMonitor.setVoltageDividerRatio(VOLTAGE_DIVIDER_RATIO);
   batteryMonitor.begin();
 
+  EspNowController::getInstance().begin();
+
   buttonManger.registerButton(&button1);
   buttonManger.registerButton(&button2);
   buttonManger.registerButton(&button3);
@@ -44,6 +47,14 @@ void loop()
 {
   if (xQueueReceive(buttonQueue, &event, portMAX_DELAY))
   {
+
+    // Send button event via ESP-NOW
+    Message message;
+    message.entityId = event.id;
+    message.type = MessageType::BUTTON_PRESS;
+    message.data.buttonPress.event = event.event;
+    EspNowController::getInstance().addMessage(&message);
+
     switch (event.event)
     {
     case SINGLE_PRESS:
