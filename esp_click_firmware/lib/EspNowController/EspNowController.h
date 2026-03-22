@@ -1,4 +1,6 @@
 #pragma once
+#include <WiFi.h>
+#include <esp_wifi.h>
 #include <Arduino.h>
 #include <esp_now.h>
 #include "ButtonManager.h"
@@ -20,8 +22,16 @@ enum MessageType
     BATTERY_STATUS,
 };
 
+// Application-level ACK structure
+struct AckMessage
+{
+    uint32_t messageId;
+    bool success;
+};
+
 struct Message
 {
+    uint32_t messageId; // Added to match ACKs
     int deviceId = 0;
     int entityId;
     MessageType type;
@@ -46,10 +56,14 @@ private:
     QueueHandle_t messageQueue;
     EventBits_t taskId;
 
-    bool ackReceived = false;
-    bool initSuccessful = false;
+    static EspNowController *s_instance;
 
-    unsigned long ackWaitTimeout = 50; // 50 ms default timeout for waiting for ACK
+    volatile bool appAckReceived = false;
+    volatile uint32_t expectedMessageId = 0;
+    uint32_t messageCounter = 0;
+
+    // Increased timeout to 100ms because an app-level reply takes slightly longer than a hardware ACK
+    unsigned long ackWaitTimeout = 100;
 
     std::function<void(Message)> onBeforeSend = nullptr;
     std::function<void(Message, bool)> onAfterSend = nullptr;
@@ -63,15 +77,37 @@ private:
         instance->run();
     }
 
-    void onAckReceived()
+    // Switched to Receive Callback
+    static void IRAM_ATTR binRecvCb(const esp_now_recv_info_t *info, const uint8_t *incomingData, int len)
     {
-        ackReceived = true;
+        if (s_instance)
+        {
+            s_instance->onDataReceived(info, incomingData, len);
+        }
+    }
+
+    void onDataReceived(const esp_now_recv_info_t *info, const uint8_t *incomingData, int len)
+    {
+        if (len == sizeof(AckMessage))
+        {
+            AckMessage *ack = (AckMessage *)incomingData;
+
+            if (ack->messageId == expectedMessageId && ack->success)
+            {
+                appAckReceived = true;
+
+                // If we are broadcasting and find a node, save its MAC address
+                if (!lastSendNode.isNodeKnown)
+                {
+                    memcpy(lastSendNode.targetMAC, info->src_addr, 6);
+                }
+            }
+        }
     }
 
     void run()
     {
-
-        initSuccessful = initEspNow();
+        bool initSuccessful = initEspNow();
 
         if (!initSuccessful)
         {
@@ -84,6 +120,8 @@ private:
             Message message;
             if (xQueueReceive(messageQueue, &message, portMAX_DELAY))
             {
+                // Assign a unique ID to the message before sending
+                message.messageId = ++messageCounter;
 
                 if (onBeforeSend)
                 {
@@ -102,7 +140,11 @@ private:
 
     bool sendMessageToKnownNode(Message *message)
     {
-        Serial.println("Sending to known node...");
+        Serial.printf("Targeting known node on channel %d\n", lastSendNode.lastChannel);
+
+        // Switch to the known channel
+        esp_wifi_set_channel(lastSendNode.lastChannel, WIFI_SECOND_CHAN_NONE);
+
         esp_now_peer_info_t peerInfo = {};
         memcpy(peerInfo.peer_addr, lastSendNode.targetMAC, 6);
         peerInfo.channel = lastSendNode.lastChannel;
@@ -115,6 +157,10 @@ private:
             return false;
         }
 
+        // Prepare for ACK
+        expectedMessageId = message->messageId;
+        appAckReceived = false;
+
         esp_now_send(lastSendNode.targetMAC, (uint8_t *)message, sizeof(Message));
 
         bool ackResult = waitForAck();
@@ -123,7 +169,7 @@ private:
 
         if (!ackResult)
         {
-            Serial.println("ACK wait failed, marking node as unknown");
+            Serial.println("App-level ACK wait failed, marking node as unknown");
             lastSendNode.isNodeKnown = false;
         }
         return ackResult;
@@ -131,7 +177,7 @@ private:
 
     bool broadcastMessage(Message *message)
     {
-        Serial.println("Broadcasting message...");
+        Serial.println("Broadcasting message (sweeping channels)...");
         uint8_t broadcastMAC[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
         esp_now_peer_info_t bcPeer = {};
@@ -144,14 +190,23 @@ private:
 
         for (int i = 1; i <= 13; i++)
         {
+            // Switch WiFi channel for the sweep
+            esp_wifi_set_channel(i, WIFI_SECOND_CHAN_NONE);
+
+            // Prepare for ACK
+            expectedMessageId = message->messageId;
+            appAckReceived = false;
+
             esp_now_send(broadcastMAC, (uint8_t *)message, sizeof(Message));
+
             bool ackResult = waitForAck();
+
             if (ackResult)
             {
-                Serial.printf("ACK received on channel %d! Updating known node info.\n", i);
+                Serial.printf("App-level ACK received on channel %d! Updating known node info.\n", i);
                 lastSendNode.lastChannel = i;
-                memcpy(lastSendNode.targetMAC, broadcastMAC, 6);
                 lastSendNode.isNodeKnown = true;
+                // targetMAC was already copied inside onDataReceived
                 break;
             }
         }
@@ -172,21 +227,29 @@ private:
             bool broadcastSuccess = broadcastMessage(message);
             if (!broadcastSuccess)
             {
-                Serial.println("Failed to send message via broadcast");
+                Serial.println("Failed to send message via broadcast sweep");
+                lastSendNode.isNodeKnown = false;
                 return false;
             }
 
-            return sendMessageToKnownNode(message);
+            // Optional: You don't necessarily need to re-send to the known node here,
+            // because the broadcast already reached it and got an ACK.
+            // Returning true is sufficient since the data was delivered.
+            return true;
         }
     }
 
     bool waitForAck()
     {
-        while (!ackReceived)
+        unsigned long start = millis();
+        while (!appAckReceived)
         {
             vTaskDelay(pdMS_TO_TICKS(1));
+            if (millis() - start > ackWaitTimeout)
+            {
+                return false;
+            }
         }
-        ackReceived = false;
         return true;
     }
 
@@ -198,8 +261,8 @@ private:
             return false;
         }
 
-        esp_now_register_send_cb([](const esp_now_send_info_t *tx_info, esp_now_send_status_t status)
-                                 { EspNowController::getInstance().onAckReceived(); });
+        // Register the RECEIVE callback for application-level ACKs
+        esp_now_register_recv_cb(binRecvCb);
 
         return true;
     }
@@ -216,15 +279,23 @@ public:
 
     void begin()
     {
+        WiFi.mode(WIFI_STA);
+        WiFi.disconnect();
+
+        s_instance = this;
+
         this->messageQueue = xQueueCreate(10, sizeof(Message));
         this->taskId = SleepManager::getInstance().registerTask();
 
-        xTaskCreate(EspNowController::controllerTask, "ESP-NOW Task", 2048, this, 1, NULL);
+        xTaskCreate(EspNowController::controllerTask, "ESP-NOW Task", 4096, this, 1, NULL);
     }
 
     void addMessage(Message *message)
     {
-        xQueueSend(messageQueue, message, 0);
+        if (messageQueue != NULL)
+        {
+            xQueueSend(messageQueue, message, 0);
+        }
     }
 
     void registerOnBeforeSend(std::function<void(Message)> callback)
@@ -237,3 +308,6 @@ public:
         this->onAfterSend = callback;
     }
 };
+
+// Define the static instance pointer outside the class
+EspNowController *EspNowController::s_instance = nullptr;
