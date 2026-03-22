@@ -36,8 +36,8 @@ private:
     QueueHandle_t messageQueue;
     EventBits_t taskId;
 
-    std::function<void()> onBeforeSend = nullptr;
-    std::function<void(bool)> onAfterSend = nullptr;
+    std::function<void(Message)> onBeforeSend = nullptr;
+    std::function<void(Message, bool)> onAfterSend = nullptr;
 
     EspNowController() {}
     ~EspNowController() {}
@@ -59,7 +59,7 @@ private:
 
                 if (onBeforeSend)
                 {
-                    onBeforeSend();
+                    onBeforeSend(message);
                 }
 
                 // Logic to send ESP-NOW message would go here
@@ -67,7 +67,7 @@ private:
 
                 if (onAfterSend)
                 {
-                    onAfterSend(success);
+                    onAfterSend(message, success);
                 }
             }
         }
@@ -95,12 +95,12 @@ public:
     {
     }
 
-    void registerOnBeforeSend(std::function<void()> callback)
+    void registerOnBeforeSend(std::function<void(Message)> callback)
     {
         this->onBeforeSend = callback;
     }
 
-    void registerOnAfterSend(std::function<void(bool)> callback)
+    void registerOnAfterSend(std::function<void(Message, bool)> callback)
     {
         this->onAfterSend = callback;
     }
