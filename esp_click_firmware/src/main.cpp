@@ -32,6 +32,24 @@ void setup()
   batteryMonitor.setVoltageDividerRatio(VOLTAGE_DIVIDER_RATIO);
   batteryMonitor.begin();
 
+  EspNowController::getInstance().registerOnAfterSend(
+      [](Message message, bool success)
+      {
+        if (message.type == MessageType::BUTTON_PRESS)
+        {
+          Serial.printf("Message for Button %d sent with event %d. Success: %d\n", message.entityId, message.data.buttonPress.event, success);
+        }
+      });
+
+  EspNowController::getInstance().registerOnBeforeSend(
+      [](Message message)
+      {
+        if (message.type == MessageType::BUTTON_PRESS)
+        {
+          Serial.printf("Preparing to send message for Button %d with event %d\n", message.entityId, message.data.buttonPress.event);
+        }
+      });
+
   EspNowController::getInstance().begin();
 
   buttonManger.registerButton(&button1);
