@@ -62,6 +62,7 @@ private:
     LedHardware hardwareType;
     LedType ledType;
     QueueHandle_t commandQueue;
+    EventBits_t taskId;
 
     static void ledTask(void *pvParameters)
     {
@@ -342,6 +343,10 @@ private:
                     setHardwareColor(targetR * pulseLevel, targetG * pulseLevel, targetB * pulseLevel);
                 }
             }
+            else if (currentCmd.mode == OFF && !isFadingOut && !isFadingIn)
+            {
+                SleepManager::getInstance().allowSleep(this->taskId);
+            }
         }
     }
 
@@ -351,6 +356,8 @@ public:
 
     void begin()
     {
+        this->taskId = SleepManager::getInstance().registerTask();
+
         commandQueue = xQueueCreate(10, sizeof(LedCommand));
 
         xTaskCreate(AsyncLed::ledTask, "LED Task", 2048, this, 1, NULL);
@@ -360,6 +367,7 @@ public:
     // 1. Full RGB Control: Mode + Color + (Optional) Speed
     void set(LedMode mode, Color color, LedSpeed speed = MEDIUM)
     {
+        SleepManager::getInstance().keepAwake(this->taskId);
         LedCommand cmd = {mode, color, speed};
         xQueueSend(commandQueue, &cmd, 0);
     }
@@ -368,6 +376,7 @@ public:
     // (Defaults to WHITE so the single pin gets 255/max brightness)
     void set(LedMode mode, LedSpeed speed)
     {
+        SleepManager::getInstance().keepAwake(this->taskId);
         LedCommand cmd = {mode, WHITE, speed};
         xQueueSend(commandQueue, &cmd, 0);
     }
@@ -375,6 +384,7 @@ public:
     // 3. Simple Control: Just Mode
     void set(LedMode mode)
     {
+        SleepManager::getInstance().keepAwake(this->taskId);
         LedCommand cmd = {mode, WHITE, MEDIUM};
         xQueueSend(commandQueue, &cmd, 0);
     }
@@ -382,6 +392,7 @@ public:
     // 4. Counted Control: Blink or Pulse X times!
     void set(LedMode mode, int count, Color color, LedSpeed speed = MEDIUM)
     {
+        SleepManager::getInstance().keepAwake(this->taskId);
         LedCommand cmd = {mode, color, speed, count};
         xQueueSend(commandQueue, &cmd, 0);
     }

@@ -136,6 +136,7 @@ private:
                 {
                     onAfterSend(message, success);
                 }
+                SleepManager::getInstance().allowSleep(this->taskId);
             }
         }
     }
@@ -293,6 +294,7 @@ public:
     {
         if (messageQueue != NULL)
         {
+            SleepManager::getInstance().keepAwake(this->taskId);
             xQueueSend(messageQueue, message, 0);
         }
     }
