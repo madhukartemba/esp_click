@@ -9,7 +9,7 @@ private:
     EventBits_t registeredTasksMask = 0;
 
     int eventCount = 0;
-    unsigned long sleepTimeout = 10000;
+    unsigned long sleepTimeout = 5000; // Default to 5 seconds of inactivity before sleeping
 
     unsigned long lastActivityTime = 0;
 
