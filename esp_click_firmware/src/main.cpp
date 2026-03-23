@@ -32,6 +32,14 @@ void setup()
   batteryMonitor.setVoltageDividerRatio(VOLTAGE_DIVIDER_RATIO);
   batteryMonitor.begin();
 
+  buttonManger.registerButton(&button1);
+  buttonManger.registerButton(&button2);
+  buttonManger.registerButton(&button3);
+  buttonManger.registerButton(&button4);
+
+  buttonManger.begin();
+  buttonQueue = buttonManger.getQueue();
+
   EspNowController::getInstance().registerOnAfterSend(
       [](Message message, bool success)
       {
@@ -51,14 +59,6 @@ void setup()
       });
 
   EspNowController::getInstance().begin();
-
-  buttonManger.registerButton(&button1);
-  buttonManger.registerButton(&button2);
-  buttonManger.registerButton(&button3);
-  buttonManger.registerButton(&button4);
-
-  buttonManger.begin();
-  buttonQueue = buttonManger.getQueue();
 }
 
 void loop()
