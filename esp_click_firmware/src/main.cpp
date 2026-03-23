@@ -45,7 +45,7 @@ void setup()
       {
         if (message.type == MessageType::BUTTON_PRESS)
         {
-          Serial.printf("Message for Button %d sent with event %d. Success: %d\n", message.entityId, message.data.buttonPress.event, success);
+          Serial.printf("Message for Button %d sent with event %d. Success: %d\n", message.data.buttonPress.buttonId, message.data.buttonPress.event, success);
         }
       });
 
@@ -54,7 +54,7 @@ void setup()
       {
         if (message.type == MessageType::BUTTON_PRESS)
         {
-          Serial.printf("Preparing to send message for Button %d with event %d\n", message.entityId, message.data.buttonPress.event);
+          Serial.printf("Preparing to send message for Button %d with event %d\n", message.data.buttonPress.buttonId, message.data.buttonPress.event);
         }
       });
 
@@ -68,8 +68,8 @@ void loop()
 
     // Send button event via ESP-NOW
     Message message;
-    message.entityId = event.id;
     message.type = MessageType::BUTTON_PRESS;
+    message.data.buttonPress.buttonId = event.id;
     message.data.buttonPress.event = event.event;
     EspNowController::getInstance().addMessage(&message);
 

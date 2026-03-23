@@ -35,12 +35,12 @@ struct __attribute__((packed)) Message
 {
     uint32_t counter;
     int deviceId = 0;
-    int entityId;
     MessageType type;
     union
     {
         struct
         {
+            int buttonId;
             PressEvent event;
         } buttonPress;
 

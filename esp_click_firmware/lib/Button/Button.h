@@ -50,7 +50,6 @@ public:
             {
                 state = PRESSED;
                 pressTimer = millis();
-                Serial.println("Button Pressed switching to PRESSED");
             }
             break;
         case PRESSED:
@@ -59,13 +58,11 @@ public:
                 // Button is long pressed
                 event = LONG_PRESS;
                 state = AWAITING_RELEASE;
-                Serial.println("Button Long Press detected switching to AWAITING_RELEASE");
             }
             else if (!isButtonPressed())
             {
                 state = WAITING_FOR_DOUBLE_PRESS;
                 pressTimer = millis();
-                Serial.println("Button Released switching to WAITING_FOR_DOUBLE_PRESS");
             }
             break;
         case WAITING_FOR_DOUBLE_PRESS:
@@ -73,20 +70,17 @@ public:
             {
                 event = SINGLE_PRESS;
                 state = IDLE;
-                Serial.println("Button Single Press detected switching to IDLE");
             }
             else if (isButtonPressed())
             {
                 event = DOUBLE_PRESS;
                 state = AWAITING_RELEASE;
-                Serial.println("Button Double Press detected switching to AWAITING_RELEASE");
             }
             break;
         case AWAITING_RELEASE:
             if (!isButtonPressed())
             {
                 state = IDLE;
-                Serial.println("Button Released switching to IDLE");
             }
             break;
         default:
