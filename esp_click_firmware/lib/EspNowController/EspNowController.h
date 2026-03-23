@@ -20,6 +20,7 @@ enum MessageType
 {
     BUTTON_PRESS,
     BATTERY_STATUS,
+    DISCOVERY_REQUEST
 };
 
 // Application-level ACK structure MUST be packed
@@ -176,9 +177,9 @@ private:
         return ackResult;
     }
 
-    bool broadcastMessage(Message *message)
+    bool findNodeViaBroadcast()
     {
-        Serial.println("Broadcasting message (sweeping channels)...");
+        Serial.println("Broadcasting DISCOVERY ping (sweeping channels)...");
         uint8_t broadcastMAC[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
         esp_now_peer_info_t bcPeer = {};
@@ -189,55 +190,52 @@ private:
 
         esp_now_add_peer(&bcPeer);
 
+        // Create a dummy message just for discovery
+        Message pingMsg;
+        pingMsg.deviceId = 0;
+        pingMsg.type = DISCOVERY_REQUEST;
+
         for (int i = 1; i <= 13; i++)
         {
-            // Switch WiFi channel for the sweep
             esp_wifi_set_channel(i, WIFI_SECOND_CHAN_NONE);
 
-            // Prepare for ACK
-            expectedMessageId = message->counter;
+            pingMsg.counter = ++messageCounter; // Assign unique ID to ping
+            expectedMessageId = pingMsg.counter;
             appAckReceived = false;
 
-            esp_now_send(broadcastMAC, (uint8_t *)message, sizeof(Message));
+            esp_now_send(broadcastMAC, (uint8_t *)&pingMsg, sizeof(Message));
 
-            bool ackResult = waitForAck();
-
-            if (ackResult)
+            if (waitForAck())
             {
-                Serial.printf("App-level ACK received on channel %d! Updating known node info.\n", i);
+                Serial.printf("Presence Node found on channel %d! Target MAC saved.\n", i);
                 lastSendNode.lastChannel = i;
                 lastSendNode.isNodeKnown = true;
-                // targetMAC was already copied inside onDataReceived
+                // Target MAC was already saved by your onDataReceived callback
                 break;
             }
         }
 
         esp_now_del_peer(broadcastMAC);
-
         return lastSendNode.isNodeKnown;
     }
 
+    // 3. Update sendMessage to use the new flow
     bool sendMessage(Message *message)
     {
-        if (lastSendNode.isNodeKnown)
+        // If we don't know a node, find one first using the Ping
+        if (!lastSendNode.isNodeKnown)
         {
-            return sendMessageToKnownNode(message);
-        }
-        else
-        {
-            bool broadcastSuccess = broadcastMessage(message);
-            if (!broadcastSuccess)
+            bool foundNode = findNodeViaBroadcast();
+            if (!foundNode)
             {
-                Serial.println("Failed to send message via broadcast sweep");
-                lastSendNode.isNodeKnown = false;
+                Serial.println("Failed to find any Presence Nodes via broadcast sweep");
                 return false;
             }
-
-            // Optional: You don't necessarily need to re-send to the known node here,
-            // because the broadcast already reached it and got an ACK.
-            // Returning true is sufficient since the data was delivered.
-            return true;
         }
+
+        // Now that we definitely have a known MAC (either cached or just found),
+        // send the ACTUAL payload directly to that specific node.
+        return sendMessageToKnownNode(message);
     }
 
     bool waitForAck()
