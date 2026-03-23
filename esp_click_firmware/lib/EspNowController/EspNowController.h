@@ -22,16 +22,17 @@ enum MessageType
     BATTERY_STATUS,
 };
 
-// Application-level ACK structure
-struct AckMessage
+// Application-level ACK structure MUST be packed
+struct __attribute__((packed)) AckMessage
 {
-    uint32_t messageId;
+    uint32_t counter;
     bool success;
 };
 
-struct Message
+// Message structure MUST be packed
+struct __attribute__((packed)) Message
 {
-    uint32_t messageId; // Added to match ACKs
+    uint32_t counter;
     int deviceId = 0;
     int entityId;
     MessageType type;
@@ -92,7 +93,7 @@ private:
         {
             AckMessage *ack = (AckMessage *)incomingData;
 
-            if (ack->messageId == expectedMessageId && ack->success)
+            if (ack->counter == expectedMessageId && ack->success)
             {
                 appAckReceived = true;
 
@@ -121,7 +122,7 @@ private:
             if (xQueueReceive(messageQueue, &message, portMAX_DELAY))
             {
                 // Assign a unique ID to the message before sending
-                message.messageId = ++messageCounter;
+                message.counter = ++messageCounter;
 
                 if (onBeforeSend)
                 {
@@ -158,7 +159,7 @@ private:
         }
 
         // Prepare for ACK
-        expectedMessageId = message->messageId;
+        expectedMessageId = message->counter;
         appAckReceived = false;
 
         esp_now_send(lastSendNode.targetMAC, (uint8_t *)message, sizeof(Message));
@@ -194,7 +195,7 @@ private:
             esp_wifi_set_channel(i, WIFI_SECOND_CHAN_NONE);
 
             // Prepare for ACK
-            expectedMessageId = message->messageId;
+            expectedMessageId = message->counter;
             appAckReceived = false;
 
             esp_now_send(broadcastMAC, (uint8_t *)message, sizeof(Message));
