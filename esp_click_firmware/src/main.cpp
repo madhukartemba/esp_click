@@ -27,11 +27,6 @@ void setup()
   Serial.begin(9600);
   SleepManager::getInstance().begin();
 
-  myLed.begin();
-
-  batteryMonitor.setVoltageDividerRatio(VOLTAGE_DIVIDER_RATIO);
-  batteryMonitor.begin();
-
   buttonManger.registerButton(&button1);
   buttonManger.registerButton(&button2);
   buttonManger.registerButton(&button3);
@@ -39,6 +34,11 @@ void setup()
 
   buttonManger.begin();
   buttonQueue = buttonManger.getQueue();
+
+  myLed.begin();
+
+  batteryMonitor.setVoltageDividerRatio(VOLTAGE_DIVIDER_RATIO);
+  batteryMonitor.begin();
 
   EspNowController::getInstance().registerOnAfterSend(
       [](Message message, bool success)
