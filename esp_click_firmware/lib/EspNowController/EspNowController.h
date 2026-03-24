@@ -13,6 +13,16 @@ struct LastSendNode
     bool isNodeKnown = false;
 };
 
+struct BestNode
+{
+    uint8_t mac[6];
+    int channel;
+    int rssi; // Higher (less negative) is better. e.g., -50 is better than -80.
+    bool found;
+};
+
+BestNode bestFoundNode = {{0}, 0, -127, false};
+
 RTC_DATA_ATTR LastSendNode lastSendNode;
 
 class EspNowController
@@ -25,9 +35,10 @@ private:
 
     volatile bool appAckReceived = false;
     volatile uint32_t expectedMessageId = 0;
+    volatile uint8_t currentSweepChannel = 0; // Tracks the channel during discovery
     uint32_t messageCounter = 0;
 
-    // Increased timeout to 100ms because an app-level reply takes slightly longer than a hardware ACK
+    // Timeout for targeted sends
     unsigned long ackWaitTimeout = 100;
 
     std::function<void(Message)> onBeforeSend = nullptr;
@@ -42,7 +53,6 @@ private:
         instance->run();
     }
 
-    // Switched to Receive Callback
     static void IRAM_ATTR binRecvCb(const esp_now_recv_info_t *info, const uint8_t *incomingData, int len)
     {
         if (s_instance)
@@ -59,12 +69,21 @@ private:
 
             if (ack->counter == expectedMessageId && ack->success)
             {
-                appAckReceived = true;
+                appAckReceived = true; // Signal targeted send that it succeeded
 
-                // If we are broadcasting and find a node, save its MAC address
+                // If we are in discovery mode (node is unknown), evaluate the RSSI
                 if (!lastSendNode.isNodeKnown)
                 {
-                    memcpy(lastSendNode.targetMAC, info->src_addr, 6);
+                    int currentRssi = info->rx_ctrl->rssi;
+
+                    // If this is the best signal we've seen so far, save it
+                    if (currentRssi > bestFoundNode.rssi)
+                    {
+                        memcpy(bestFoundNode.mac, info->src_addr, 6);
+                        bestFoundNode.rssi = currentRssi;
+                        bestFoundNode.channel = currentSweepChannel;
+                        bestFoundNode.found = true;
+                    }
                 }
             }
         }
@@ -85,7 +104,6 @@ private:
             Message message;
             if (xQueueReceive(messageQueue, &message, portMAX_DELAY))
             {
-                // Assign a unique ID to the message before sending
                 message.counter = ++messageCounter;
 
                 if (onBeforeSend)
@@ -108,7 +126,6 @@ private:
     {
         Serial.printf("Targeting known node on channel %d\n", lastSendNode.lastChannel);
 
-        // Switch to the known channel
         esp_wifi_set_channel(lastSendNode.lastChannel, WIFI_SECOND_CHAN_NONE);
 
         esp_now_peer_info_t peerInfo = {};
@@ -123,7 +140,6 @@ private:
             return false;
         }
 
-        // Prepare for ACK
         expectedMessageId = message->counter;
         appAckReceived = false;
 
@@ -146,6 +162,10 @@ private:
         Serial.println("Broadcasting DISCOVERY ping (sweeping channels)...");
         uint8_t broadcastMAC[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
+        // Reset discovery tracking before we start
+        bestFoundNode = {{0}, 0, -127, false};
+        lastSendNode.isNodeKnown = false; // Ensures the callback records RSSI
+
         esp_now_peer_info_t bcPeer = {};
         memcpy(bcPeer.peer_addr, broadcastMAC, 6);
         bcPeer.channel = 0;
@@ -154,63 +174,62 @@ private:
 
         esp_now_add_peer(&bcPeer);
 
-        // Create a dummy message just for discovery
         Message pingMsg;
         pingMsg.deviceId = 0;
         pingMsg.type = DISCOVERY_REQUEST;
 
+        // Sweep all 13 channels
         for (int i = 1; i <= 13; i++)
         {
             esp_wifi_set_channel(i, WIFI_SECOND_CHAN_NONE);
+            currentSweepChannel = i; // Update global so the callback knows the channel
 
-            pingMsg.counter = ++messageCounter; // Assign unique ID to ping
+            pingMsg.counter = ++messageCounter;
             expectedMessageId = pingMsg.counter;
-            appAckReceived = false;
 
             esp_now_send(broadcastMAC, (uint8_t *)&pingMsg, sizeof(Message));
 
-            if (waitForAck())
-            {
-                Serial.printf("Presence Node found on channel %d! Target MAC saved.\n", i);
-                lastSendNode.lastChannel = i;
-                lastSendNode.isNodeKnown = true;
-                break;
-            }
+            // Fixed delay to allow ALL nodes on this channel time to reply
+            // We do NOT use waitForAck() here because that stops at the first reply
+            vTaskDelay(pdMS_TO_TICKS(50));
         }
 
         esp_now_del_peer(broadcastMAC);
+
+        // Evaluate results after the full sweep
+        if (bestFoundNode.found)
+        {
+            Serial.printf("Best Presence Node found on CH %d with RSSI %d!\n", bestFoundNode.channel, bestFoundNode.rssi);
+            lastSendNode.lastChannel = bestFoundNode.channel;
+            memcpy(lastSendNode.targetMAC, bestFoundNode.mac, 6);
+            lastSendNode.isNodeKnown = true;
+        }
+        else
+        {
+            Serial.println("No nodes found during sweep.");
+        }
+
         return lastSendNode.isNodeKnown;
     }
 
     bool sendMessage(Message *message)
     {
-        // 1. Ensure we have a node to talk to
         if (!lastSendNode.isNodeKnown && !findNodeViaBroadcast())
         {
             Serial.println("Failed to find any Presence Nodes via broadcast sweep");
             return false;
         }
 
-        // 2. Attempt to send
         if (sendMessageToKnownNode(message))
         {
             Serial.println("Message sent and ACK received successfully!");
             return true;
         }
-        else
-        {
-            Serial.println("Failed to send message to known node");
-        }
 
-        // 3. If primary send fails, rediscover and try one last time
         Serial.println("Failed to send to known node, broadcasting again to rediscover");
         if (findNodeViaBroadcast())
         {
             return sendMessageToKnownNode(message);
-        }
-        else
-        {
-            Serial.println("Rediscovery failed, no nodes found");
         }
 
         return false;
@@ -238,9 +257,7 @@ private:
             return false;
         }
 
-        // Register the RECEIVE callback for application-level ACKs
         esp_now_register_recv_cb(binRecvCb);
-
         return true;
     }
 
@@ -287,5 +304,4 @@ public:
     }
 };
 
-// Define the static instance pointer outside the class
 EspNowController *EspNowController::s_instance = nullptr;

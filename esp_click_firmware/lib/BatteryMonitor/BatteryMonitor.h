@@ -21,7 +21,7 @@ private:
     float batteryPresenceVoltageThreshold = 2.4f;
     float batteryFullyChargedVoltageThreshold = 4.0f;
     float batteryVoltageRangeMin = 3.0f;
-    float batteryVoltageRangeMax = 4.15f;
+    float batteryVoltageRangeMax = 4.10f;
 
     EventBits_t taskId;
 
