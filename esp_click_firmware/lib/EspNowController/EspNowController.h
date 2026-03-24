@@ -174,7 +174,6 @@ private:
                 Serial.printf("Presence Node found on channel %d! Target MAC saved.\n", i);
                 lastSendNode.lastChannel = i;
                 lastSendNode.isNodeKnown = true;
-                // Target MAC was already saved by your onDataReceived callback
                 break;
             }
         }
@@ -182,24 +181,38 @@ private:
         esp_now_del_peer(broadcastMAC);
         return lastSendNode.isNodeKnown;
     }
-
-    // 3. Update sendMessage to use the new flow
     bool sendMessage(Message *message)
     {
-        // If we don't know a node, find one first using the Ping
-        if (!lastSendNode.isNodeKnown)
+        // 1. Ensure we have a node to talk to
+        if (!lastSendNode.isNodeKnown && !findNodeViaBroadcast())
         {
-            bool foundNode = findNodeViaBroadcast();
-            if (!foundNode)
-            {
-                Serial.println("Failed to find any Presence Nodes via broadcast sweep");
-                return false;
-            }
+            Serial.println("Failed to find any Presence Nodes via broadcast sweep");
+            return false;
         }
 
-        // Now that we definitely have a known MAC (either cached or just found),
-        // send the ACTUAL payload directly to that specific node.
-        return sendMessageToKnownNode(message);
+        // 2. Attempt to send
+        if (sendMessageToKnownNode(message))
+        {
+            Serial.println("Message sent and ACK received successfully!");
+            return true;
+        }
+        else
+        {
+            Serial.println("Failed to send message to known node");
+        }
+
+        // 3. If primary send fails, rediscover and try one last time
+        Serial.println("Failed to send to known node, broadcasting again to rediscover");
+        if (findNodeViaBroadcast())
+        {
+            return sendMessageToKnownNode(message);
+        }
+        else
+        {
+            Serial.println("Rediscovery failed, no nodes found");
+        }
+
+        return false;
     }
 
     bool waitForAck()
