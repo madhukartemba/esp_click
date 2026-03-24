@@ -2,6 +2,9 @@
 #include <Arduino.h>
 #include "Button.h"
 #include "SleepManager.h"
+#include "EspNowController.h"
+#include "PressEvent.h"
+#include "Message.h"
 
 struct ButtonEvent
 {
@@ -14,7 +17,6 @@ class ButtonManager
 private:
     int buttonCount = 0;
     std::vector<Button *> buttons;
-    QueueHandle_t buttonEventQueue;
 
     EventBits_t taskId;
 
@@ -33,8 +35,11 @@ private:
                 button->update();
                 if (button->hasEvent())
                 {
-                    ButtonEvent event = {.id = button->getPin(), .event = button->getEvent()};
-                    xQueueSend(buttonEventQueue, &event, 0);
+                    Message message;
+                    message.type = MessageType::BUTTON_PRESS;
+                    message.data.buttonPress.buttonId = button->getPin();
+                    message.data.buttonPress.event = button->getEvent();
+                    EspNowController::getInstance().addMessage(message);
                 }
             }
             vTaskDelay(pdMS_TO_TICKS(10));
@@ -44,7 +49,6 @@ private:
 public:
     void begin()
     {
-        buttonEventQueue = xQueueCreate(10, sizeof(ButtonEvent));
         taskId = SleepManager::getInstance().registerTask();
         xTaskCreate(ButtonManager::buttonTask, "Button Manager", 2048, this, 1, NULL);
     }
@@ -69,8 +73,4 @@ public:
             });
     }
 
-    QueueHandle_t getQueue()
-    {
-        return buttonEventQueue;
-    }
 };

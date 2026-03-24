@@ -3,9 +3,8 @@
 #include <esp_wifi.h>
 #include <Arduino.h>
 #include <esp_now.h>
-#include "ButtonManager.h"
-#include "BatteryStatus.h"
 #include "SleepManager.h"
+#include "Message.h"
 
 struct LastSendNode
 {
@@ -15,42 +14,6 @@ struct LastSendNode
 };
 
 RTC_DATA_ATTR LastSendNode lastSendNode;
-
-enum MessageType
-{
-    BUTTON_PRESS,
-    BATTERY_STATUS,
-    DISCOVERY_REQUEST
-};
-
-// Application-level ACK structure MUST be packed
-struct __attribute__((packed)) AckMessage
-{
-    uint32_t counter;
-    bool success;
-};
-
-// Message structure MUST be packed
-struct __attribute__((packed)) Message
-{
-    uint32_t counter;
-    int deviceId = 0;
-    MessageType type;
-    union
-    {
-        struct
-        {
-            int buttonId;
-            PressEvent event;
-        } buttonPress;
-
-        struct
-        {
-            int level;
-            BatteryStatus status;
-        } batteryLevel;
-    } data;
-};
 
 class EspNowController
 {

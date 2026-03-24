@@ -6,7 +6,6 @@
 #include "SleepManager.h"
 #include "EspNowController.h"
 
-
 AsyncLed myLed(
     BoardConfig::LED_PIN_R, 
     BoardConfig::LED_PIN_G, 
@@ -27,9 +26,6 @@ Button button4(BoardConfig::BTN4_PIN, INPUT, true);
 
 ButtonManager buttonManger;
 
-QueueHandle_t buttonQueue;
-ButtonEvent event;
-
 void setup()
 {
   Serial.begin(9600);
@@ -41,7 +37,6 @@ void setup()
   buttonManger.registerButton(&button4);
 
   buttonManger.begin();
-  buttonQueue = buttonManger.getQueue();
 
   myLed.begin();
 
@@ -71,32 +66,4 @@ void setup()
 
 void loop()
 {
-  if (xQueueReceive(buttonQueue, &event, portMAX_DELAY))
-  {
-
-    // Send button event via ESP-NOW
-    Message message;
-    message.type = MessageType::BUTTON_PRESS;
-    message.data.buttonPress.buttonId = event.id;
-    message.data.buttonPress.event = event.event;
-    EspNowController::getInstance().addMessage(message);
-
-    switch (event.event)
-    {
-    case SINGLE_PRESS:
-      Serial.printf("Button %d Single Press\n", event.id);
-      myLed.set(PULSE, 1, WHITE);
-      break;
-    case DOUBLE_PRESS:
-      Serial.printf("Button %d Double Press\n", event.id);
-      myLed.set(PULSE, 1, GREEN);
-      break;
-    case LONG_PRESS:
-      Serial.printf("Button %d Long Press\n", event.id);
-      myLed.set(PULSE, 1, BLUE);
-      break;
-    default:
-      break;
-    }
-  }
 }

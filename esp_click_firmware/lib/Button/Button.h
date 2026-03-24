@@ -10,14 +10,6 @@ enum ButtonState
     AWAITING_RELEASE
 };
 
-enum PressEvent
-{
-    NONE,
-    SINGLE_PRESS,
-    DOUBLE_PRESS,
-    LONG_PRESS,
-};
-
 class Button : public DigitalInput
 {
 private:
