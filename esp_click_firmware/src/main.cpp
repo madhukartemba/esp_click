@@ -48,7 +48,11 @@ void setup()
       {
         if (message.type == MessageType::BUTTON_PRESS)
         {
-          Serial.printf("Message for Button %d sent with event %d. Success: %d\n", message.data.buttonPress.buttonId, message.data.buttonPress.event, success);
+          if(success) {
+            myLed.set(LedMode::BLINK, 1, Color::GREEN);
+          } else {
+            myLed.set(LedMode::BLINK, 2, Color::RED);
+          }
         }
       });
 
@@ -57,7 +61,7 @@ void setup()
       {
         if (message.type == MessageType::BUTTON_PRESS)
         {
-          Serial.printf("Preparing to send message for Button %d with event %d\n", message.data.buttonPress.buttonId, message.data.buttonPress.event);
+          myLed.set(LedMode::SOLID, 1, Color::WHITE);
         }
       });
 
