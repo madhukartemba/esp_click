@@ -64,6 +64,7 @@ private:
         }
 
         bool firstRun = true;
+        int previousBatteryLevel = -1;
         BatteryStatus lastPublishedStatus = BatteryStatus::NOT_CONNECTED;
 
         while (true)
@@ -131,9 +132,8 @@ private:
                 // Always publish immediately if a cable is plugged in or unplugged
                 shouldPublish = true;
             }
-            else if (status == BatteryStatus::CHARGING || status == BatteryStatus::FULL_CHARGED)
+            else if (abs(previousBatteryLevel - batteryLevel) >= 5)
             {
-                // If awake permanently on charger, publish only as the percentage ticks up
                 shouldPublish = true;
             }
 

@@ -347,6 +347,7 @@ private:
             }
             else if (currentCmd.mode == OFF && !isFadingOut && !isFadingIn)
             {
+                Serial.println("LED is OFF, putting task to sleep until next command...");
                 SleepManager::getInstance().allowSleep(this->taskId);
             }
         }
