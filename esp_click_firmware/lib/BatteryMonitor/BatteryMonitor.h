@@ -185,6 +185,8 @@ public:
     void begin()
     {
         this->taskId = SleepManager::getInstance().registerTask();
+        SleepManager::getInstance().registerWakeupPin(powerGoodInput->getPin());
+        SleepManager::getInstance().registerWakeupPin(chargeInput->getPin());
         xTaskCreate(BatteryMonitor::monitorTask, "Battery Monitor", 2048, this, 1, NULL);
     }
 
