@@ -151,6 +151,7 @@ private:
 
                 firstRun = false;
                 lastPublishedStatus = status;
+                previousBatteryLevel = batteryLevel;
             }
 
             // 4. Wait 3 seconds before next ADC poll
