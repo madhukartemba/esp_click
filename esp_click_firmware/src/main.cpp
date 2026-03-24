@@ -7,17 +7,15 @@
 #include "EspNowController.h"
 
 AsyncLed myLed(
-    BoardConfig::LED_PIN_R, 
-    BoardConfig::LED_PIN_G, 
-    BoardConfig::LED_PIN_B, 
-    COMMON_ANODE
-);
+    BoardConfig::LED_PIN_R,
+    BoardConfig::LED_PIN_G,
+    BoardConfig::LED_PIN_B,
+    COMMON_ANODE);
 
 BatteryMonitor batteryMonitor(
-    BoardConfig::BATTERY_PIN, 
+    BoardConfig::BATTERY_PIN,
     BoardConfig::POWER_GOOD_PIN,
-    BoardConfig::CHARGE_DETECT_PIN
-);
+    BoardConfig::CHARGE_DETECT_PIN);
 
 Button button1(BoardConfig::BTN1_PIN, INPUT, true);
 Button button2(BoardConfig::BTN2_PIN, INPUT, true);
@@ -41,6 +39,37 @@ void setup()
   myLed.begin();
 
   batteryMonitor.setVoltageDividerRatio(BoardConfig::VOLTAGE_DIVIDER_RATIO);
+
+  batteryMonitor.onBatteryStatusChange(
+      [](BatteryStatus status)
+      {
+        switch (status)
+        {
+        case NOT_CONNECTED:
+          Serial.println("NOT_CONNECTED");
+          myLed.set(LedMode::SOLID, 6, Color::RED);
+          break;
+        case CHARGING:
+          Serial.println("CHARGING");
+          myLed.set(LedMode::PULSE, Color::RED);
+          break;
+        case DISCHARGING:
+          Serial.println("DISCHARGING");
+          break;
+        case FULL_CHARGED:
+          Serial.println("FULL_CHARGED");
+          myLed.set(LedMode::SOLID, Color::GREEN);
+          break;
+        case CHARGE_FAULT:
+          Serial.println("CHARGE_FAULT");
+          myLed.set(LedMode::BLINK, 3, Color::RED);
+          break;
+        default:
+          Serial.println("UNKNOWN");
+          break;
+        }
+      });
+
   batteryMonitor.begin();
 
   EspNowController::getInstance().registerOnAfterSend(
@@ -48,9 +77,12 @@ void setup()
       {
         if (message.type == MessageType::BUTTON_PRESS)
         {
-          if(success) {
-            myLed.set(LedMode::BLINK, 1, Color::GREEN);
-          } else {
+          if (success)
+          {
+            myLed.set(LedMode::OFF);
+          }
+          else
+          {
             myLed.set(LedMode::BLINK, 2, Color::RED);
           }
         }
@@ -61,7 +93,12 @@ void setup()
       {
         if (message.type == MessageType::BUTTON_PRESS)
         {
-          myLed.set(LedMode::SOLID, 1, Color::WHITE);
+          if (message.data.buttonPress.event == SINGLE_PRESS)
+            myLed.set(LedMode::SOLID, Color::WHITE);
+          else if (message.data.buttonPress.event == DOUBLE_PRESS)
+            myLed.set(LedMode::SOLID, Color::GREEN);
+          else if (message.data.buttonPress.event == LONG_PRESS)
+            myLed.set(LedMode::SOLID, Color::BLUE);
         }
       });
 
