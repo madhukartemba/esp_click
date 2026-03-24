@@ -181,6 +181,7 @@ private:
         esp_now_del_peer(broadcastMAC);
         return lastSendNode.isNodeKnown;
     }
+
     bool sendMessage(Message *message)
     {
         // 1. Ensure we have a node to talk to
