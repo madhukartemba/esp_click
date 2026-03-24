@@ -100,6 +100,14 @@ public:
 
     void allowSleep(EventBits_t taskId)
     {
+        // Check if the task is already allowed to sleep to avoid unnecessary event group updates
+        EventBits_t currentBits = xEventGroupGetBits(sleepEventGroup);
+        if ((currentBits & taskId) != 0)
+        {
+            // Task is already allowed to sleep, no action needed
+            return;
+        }
+
         xEventGroupSetBits(sleepEventGroup, taskId);
         lastActivityTime = millis();
     }

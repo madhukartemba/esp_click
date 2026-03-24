@@ -71,7 +71,7 @@ void loop()
     message.type = MessageType::BUTTON_PRESS;
     message.data.buttonPress.buttonId = event.id;
     message.data.buttonPress.event = event.event;
-    EspNowController::getInstance().addMessage(&message);
+    EspNowController::getInstance().addMessage(message);
 
     switch (event.event)
     {

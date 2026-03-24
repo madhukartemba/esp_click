@@ -106,8 +106,8 @@ private:
                 }
             }
 
-            // === 2. SMART SLEEP LOCK LOGIC ===
-            if (status == BatteryStatus::CHARGING || status == FULL_CHARGED)
+            // // === 2. SMART SLEEP LOCK LOGIC ===
+            if (status == BatteryStatus::CHARGING || status == BatteryStatus::FULL_CHARGED)
             {
                 // Infinite power available: keep the MCU awake permanently
                 SleepManager::getInstance().keepAwake(this->taskId);
@@ -147,7 +147,7 @@ private:
                 message.type = MessageType::BATTERY_STATUS;
                 message.data.batteryLevel.level = batteryLevel;
                 message.data.batteryLevel.status = status;
-                EspNowController::getInstance().addMessage(&message);
+                EspNowController::getInstance().addMessage(message);
 
                 firstRun = false;
                 lastPublishedStatus = status;

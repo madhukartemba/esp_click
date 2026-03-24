@@ -290,13 +290,12 @@ public:
         xTaskCreate(EspNowController::controllerTask, "ESP-NOW Task", 4096, this, 1, NULL);
     }
 
-    void addMessage(Message *message)
+    void addMessage(Message message)
     {
         if (messageQueue != NULL)
         {
-            Serial.println("Message added to queue");
             SleepManager::getInstance().keepAwake(this->taskId);
-            xQueueSend(messageQueue, message, 0);
+            xQueueSend(messageQueue, &message, 0);
         }
     }
 
