@@ -12,7 +12,7 @@ class BatteryMonitor
 private:
     float voltageDividerRatio = 1.0f;
     int batteryLevel = 0;
-    BatteryStatus previousStatus = BatteryStatus::NOT_CONNECTED;
+    BatteryStatus previousStatus = BatteryStatus::DISCHARGING;
     BatteryStatus status = BatteryStatus::DISCHARGING;
     AnalogInput *batteryAdcInput;
     DigitalInput *powerGoodInput;

@@ -97,7 +97,9 @@ void setup()
       {
         if (message.type == MessageType::BUTTON_PRESS)
         {
-          if (message.data.buttonPress.event == SINGLE_PRESS)
+          if (batteryMonitor.getBatteryLevel() <= BoardConfig::LOW_BATTERY_THRESHOLD)
+            myLed.set(LedMode::SOLID, Color::RED);
+          else if (message.data.buttonPress.event == SINGLE_PRESS)
             myLed.set(LedMode::SOLID, Color::WHITE);
           else if (message.data.buttonPress.event == DOUBLE_PRESS)
             myLed.set(LedMode::SOLID, Color::GREEN);
