@@ -55,7 +55,7 @@ void setup()
           break;
         case DISCHARGING:
           Serial.println("DISCHARGING");
-          if (oldStatus == BatteryStatus::CHARGING || oldStatus == BatteryStatus::FULL_CHARGED)
+          if (oldStatus != DISCHARGING)
           {
             myLed.set(LedMode::OFF);
           }
