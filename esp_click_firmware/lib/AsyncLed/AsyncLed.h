@@ -345,7 +345,8 @@ private:
                     setHardwareColor(targetR * pulseLevel, targetG * pulseLevel, targetB * pulseLevel);
                 }
             }
-            else if (currentCmd.mode == OFF && !isFadingOut && !isFadingIn)
+
+            if (currentCmd.mode == OFF && !isFadingOut && !isFadingIn)
             {
                 Serial.println("LED is OFF, putting task to sleep until next command...");
                 SleepManager::getInstance().allowSleep(this->taskId);
