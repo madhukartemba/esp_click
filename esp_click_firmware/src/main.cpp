@@ -64,6 +64,4 @@ void setup()
   EspNowController::getInstance().begin();
 }
 
-void loop()
-{
-}
+void loop() {}
