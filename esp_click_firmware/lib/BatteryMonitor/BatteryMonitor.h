@@ -134,7 +134,7 @@ private:
                 // Always publish immediately if a cable is plugged in or unplugged
                 shouldPublish = true;
             }
-            else if ((status == BatteryStatus::CHARGING || status == FULL_CHARGED) && levelChanged)
+            else if ((status == BatteryStatus::CHARGING || status == FULL_CHARGED))
             {
                 // If awake permanently on charger, publish as the percentage ticks up
                 shouldPublish = true;
