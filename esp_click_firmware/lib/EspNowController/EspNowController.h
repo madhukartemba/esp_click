@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <esp_now.h>
 #include "ButtonManager.h"
-#include "BatteryMonitor.h"
+#include "BatteryStatus.h"
 #include "SleepManager.h"
 
 struct LastSendNode

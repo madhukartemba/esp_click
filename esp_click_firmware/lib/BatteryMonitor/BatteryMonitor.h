@@ -3,23 +3,17 @@
 #include "AnalogInput.h"
 #include "DigitalInput.h"
 #include "Utils.h"
-
-enum BatteryStatus
-{
-    CHARGING,
-    DISCHARGING,
-    FULL_CHARGED,
-    NOT_CONNECTED,
-    CHARGE_FAULT,
-};
+#include "EspNowController.h"
+#include "SleepManager.h"
+#include "BatteryStatus.h"
 
 class BatteryMonitor
 {
 private:
     float voltageDividerRatio = 1.0f;
     int batteryLevel = 0;
-    BatteryStatus previousStatus = NOT_CONNECTED;
-    BatteryStatus status = DISCHARGING;
+    BatteryStatus previousStatus = BatteryStatus::NOT_CONNECTED;
+    BatteryStatus status = BatteryStatus::DISCHARGING;
     AnalogInput *batteryAdcInput;
     DigitalInput *powerGoodInput;
     DigitalInput *chargeInput;
@@ -28,6 +22,8 @@ private:
     float batteryFullyChargedVoltageThreshold = 4.0f;
     float batteryVoltageRangeMin = 3.0f;
     float batteryVoltageRangeMax = 4.15f;
+
+    EventBits_t taskId;
 
     std::function<void(BatteryStatus)> batteryStatusChangeCallback = nullptr;
 
@@ -60,60 +56,104 @@ private:
 
     void run()
     {
+        // === ADC STABILIZATION WARM-UP ===
+        for (int i = 0; i < 5; i++)
+        {
+            getBatteryVoltage();
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+
+        bool firstRun = true;
+        BatteryStatus lastPublishedStatus = BatteryStatus::NOT_CONNECTED;
+        int lastPublishedLevel = -1;
+
         while (true)
         {
+            // 1. Read the ADC
             float voltage = getBatteryVoltage();
             calculateBatteryLevel(voltage);
 
             if (voltage < batteryPresenceVoltageThreshold)
             {
-                status = NOT_CONNECTED;
+                status = BatteryStatus::NOT_CONNECTED;
                 batteryLevel = 0;
-                continue;
-            }
-
-            bool isInputPowerGood = powerGoodInput->isActive();
-            bool isCharging = chargeInput->isActive();
-
-            if (isInputPowerGood && isCharging)
-            {
-                status = CHARGING;
-            }
-            else if (isInputPowerGood && !isCharging)
-            {
-                if (voltage < batteryPresenceVoltageThreshold)
-                {
-                    status = NOT_CONNECTED;
-                }
-                else if (voltage < batteryFullyChargedVoltageThreshold)
-                {
-                    status = DISCHARGING;
-                }
-                else
-                {
-                    status = FULL_CHARGED;
-                }
-            }
-            else if (!isInputPowerGood && !isCharging)
-            {
-                status = DISCHARGING;
             }
             else
             {
-                status = CHARGE_FAULT;
+                bool isInputPowerGood = powerGoodInput->isActive();
+                bool isCharging = chargeInput->isActive();
+
+                if (isInputPowerGood && isCharging)
+                {
+                    status = BatteryStatus::CHARGING;
+                }
+                else if (isInputPowerGood && !isCharging)
+                {
+                    if (voltage < batteryPresenceVoltageThreshold)
+                        status = BatteryStatus::NOT_CONNECTED;
+                    else if (voltage < batteryFullyChargedVoltageThreshold)
+                        status = BatteryStatus::DISCHARGING;
+                    else
+                        status = BatteryStatus::FULL_CHARGED;
+                }
+                else if (!isInputPowerGood && !isCharging)
+                {
+                    status = BatteryStatus::DISCHARGING;
+                }
+                else
+                {
+                    status = BatteryStatus::CHARGE_FAULT;
+                }
             }
 
-            Serial.printf("Battery Voltage: %.2f V, Level: %d%%, Status: %d \n", voltage, batteryLevel, status);
+            // === 2. SMART SLEEP LOCK LOGIC ===
+            if (status == BatteryStatus::CHARGING || status == FULL_CHARGED)
+            {
+                // Infinite power available: keep the MCU awake permanently
+                SleepManager::getInstance().keepAwake(this->taskId);
+            }
+            else
+            {
+                // On battery: allow the SleepManager to count down and sleep
+                SleepManager::getInstance().allowSleep(this->taskId);
+            }
 
-            if (previousStatus != status)
+            // === 3. SMART PUBLISH LOGIC ===
+            bool statusChanged = (status != lastPublishedStatus);
+            bool levelChanged = (abs(batteryLevel - lastPublishedLevel) >= 1);
+
+            bool shouldPublish = false;
+
+            if (firstRun)
+            {
+                // Always publish once per wake cycle so HA knows the current level
+                shouldPublish = true;
+            }
+            else if (statusChanged)
+            {
+                // Always publish immediately if a cable is plugged in or unplugged
+                shouldPublish = true;
+            }
+            else if ((status == BatteryStatus::CHARGING || status == FULL_CHARGED) && levelChanged)
+            {
+                // If awake permanently on charger, publish as the percentage ticks up
+                shouldPublish = true;
+            }
+
+            if (shouldPublish)
             {
                 if (batteryStatusChangeCallback)
                 {
                     batteryStatusChangeCallback(status);
                 }
-                previousStatus = status;
+                Message message;
+                message.type = MessageType::BATTERY_STATUS;
+                message.data.batteryLevel.level = batteryLevel;
+                message.data.batteryLevel.status = status;
+                EspNowController::getInstance().addMessage(&message);
             }
 
+            // 4. Wait 3 seconds before next ADC poll
             vTaskDelay(pdMS_TO_TICKS(3000));
         }
     }
@@ -143,6 +183,7 @@ public:
 
     void begin()
     {
+        this->taskId = SleepManager::getInstance().registerTask();
         xTaskCreate(BatteryMonitor::monitorTask, "Battery Monitor", 2048, this, 1, NULL);
     }
 
