@@ -57,7 +57,7 @@ private:
     void run()
     {
         // === ADC STABILIZATION WARM-UP ===
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 50; i++)
         {
             getBatteryVoltage();
             vTaskDelay(pdMS_TO_TICKS(10));
@@ -65,7 +65,6 @@ private:
 
         bool firstRun = true;
         int previousBatteryLevel = -1;
-        BatteryStatus lastPublishedStatus = BatteryStatus::NOT_CONNECTED;
 
         while (true)
         {
@@ -118,7 +117,7 @@ private:
                 SleepManager::getInstance().allowSleep(this->taskId);
             }
 
-            bool statusChanged = (status != lastPublishedStatus);
+            bool statusChanged = (status != previousStatus);
 
             bool shouldPublish = false;
 
@@ -141,8 +140,9 @@ private:
             {
                 if (batteryStatusChangeCallback)
                 {
-                    batteryStatusChangeCallback(lastPublishedStatus, status);
+                    batteryStatusChangeCallback(previousStatus, status);
                 }
+
                 Message message;
                 message.type = MessageType::BATTERY_STATUS;
                 message.data.batteryLevel.level = batteryLevel;
@@ -150,7 +150,7 @@ private:
                 EspNowController::getInstance().addMessage(message);
 
                 firstRun = false;
-                lastPublishedStatus = status;
+                previousStatus = status;
                 previousBatteryLevel = batteryLevel;
             }
 
