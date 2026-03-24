@@ -65,7 +65,6 @@ private:
 
         bool firstRun = true;
         BatteryStatus lastPublishedStatus = BatteryStatus::NOT_CONNECTED;
-        int lastPublishedLevel = -1;
 
         while (true)
         {
@@ -118,9 +117,7 @@ private:
                 SleepManager::getInstance().allowSleep(this->taskId);
             }
 
-            // === 3. SMART PUBLISH LOGIC ===
             bool statusChanged = (status != lastPublishedStatus);
-            bool levelChanged = (abs(batteryLevel - lastPublishedLevel) >= 1);
 
             bool shouldPublish = false;
 
@@ -134,9 +131,9 @@ private:
                 // Always publish immediately if a cable is plugged in or unplugged
                 shouldPublish = true;
             }
-            else if ((status == BatteryStatus::CHARGING || status == FULL_CHARGED))
+            else if (status == BatteryStatus::CHARGING || status == BatteryStatus::FULL_CHARGED)
             {
-                // If awake permanently on charger, publish as the percentage ticks up
+                // If awake permanently on charger, publish only as the percentage ticks up
                 shouldPublish = true;
             }
 
@@ -151,6 +148,9 @@ private:
                 message.data.batteryLevel.level = batteryLevel;
                 message.data.batteryLevel.status = status;
                 EspNowController::getInstance().addMessage(&message);
+
+                firstRun = false;
+                lastPublishedStatus = status;
             }
 
             // 4. Wait 3 seconds before next ADC poll
