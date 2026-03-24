@@ -294,6 +294,7 @@ public:
     {
         if (messageQueue != NULL)
         {
+            Serial.println("Message added to queue");
             SleepManager::getInstance().keepAwake(this->taskId);
             xQueueSend(messageQueue, message, 0);
         }
