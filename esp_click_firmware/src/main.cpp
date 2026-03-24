@@ -1,4 +1,4 @@
-#include <Arduino.h>
+#include "BoardConfig.h"
 #include "AsyncLed.h"
 #include "BatteryMonitor.h"
 #include "Button.h"
@@ -6,16 +6,24 @@
 #include "SleepManager.h"
 #include "EspNowController.h"
 
-#define VOLTAGE_DIVIDER_RATIO (910.0f / 1380.0f)
 
-AsyncLed myLed(21, 22, 23, COMMON_ANODE);
+AsyncLed myLed(
+    BoardConfig::LED_PIN_R, 
+    BoardConfig::LED_PIN_G, 
+    BoardConfig::LED_PIN_B, 
+    COMMON_ANODE
+);
 
-BatteryMonitor batteryMonitor(6, 4, 5);
+BatteryMonitor batteryMonitor(
+    BoardConfig::BATTERY_PIN, 
+    BoardConfig::POWER_GOOD_PIN,
+    BoardConfig::CHARGE_DETECT_PIN
+);
 
-Button button1(0, INPUT, true);
-Button button2(1, INPUT, true);
-Button button3(2, INPUT, true);
-Button button4(3, INPUT, true);
+Button button1(BoardConfig::BTN1_PIN, INPUT, true);
+Button button2(BoardConfig::BTN2_PIN, INPUT, true);
+Button button3(BoardConfig::BTN3_PIN, INPUT, true);
+Button button4(BoardConfig::BTN4_PIN, INPUT, true);
 
 ButtonManager buttonManger;
 
@@ -37,7 +45,7 @@ void setup()
 
   myLed.begin();
 
-  batteryMonitor.setVoltageDividerRatio(VOLTAGE_DIVIDER_RATIO);
+  batteryMonitor.setVoltageDividerRatio(BoardConfig::VOLTAGE_DIVIDER_RATIO);
   batteryMonitor.begin();
 
   EspNowController::getInstance().registerOnAfterSend(
