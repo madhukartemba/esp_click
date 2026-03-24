@@ -51,7 +51,7 @@ void setup()
           break;
         case CHARGING:
           Serial.println("CHARGING");
-          myLed.set(LedMode::PULSE, Color::RED, LedSpeed::SLOW);
+          myLed.set(LedMode::PULSE, Color::RED, LedSpeed::GLACIAL);
           break;
         case DISCHARGING:
           Serial.println("DISCHARGING");
