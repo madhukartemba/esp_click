@@ -13,7 +13,7 @@ namespace BoardConfig
     constexpr uint8_t POWER_GOOD_PIN = 4;
     constexpr uint8_t CHARGE_DETECT_PIN = 5;
     constexpr float VOLTAGE_DIVIDER_RATIO = 910.0f / 1380.0f;
-    constexpr int LOW_BATTERY_THRESHOLD = 80;
+    constexpr int LOW_BATTERY_THRESHOLD = 30;
 
     // Button Configuration
     constexpr uint8_t BTN1_PIN = 0;

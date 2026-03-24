@@ -11,7 +11,7 @@ class BatteryMonitor
 {
 private:
     float voltageDividerRatio = 1.0f;
-    int batteryLevel = 0;
+    int batteryLevel = -1;
     BatteryStatus previousStatus = BatteryStatus::DISCHARGING;
     BatteryStatus status = BatteryStatus::DISCHARGING;
     AnalogInput *batteryAdcInput;
@@ -172,8 +172,12 @@ public:
         voltageDividerRatio = ratio;
     }
 
-    int getBatteryLevel() const
+    int getBatteryLevel()
     {
+        if (batteryLevel == -1)
+        {
+            calculateBatteryLevel();
+        }
         return batteryLevel;
     }
 
