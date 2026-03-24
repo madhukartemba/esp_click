@@ -25,7 +25,7 @@ private:
 
     EventBits_t taskId;
 
-    std::function<void(BatteryStatus)> batteryStatusChangeCallback = nullptr;
+    std::function<void(BatteryStatus, BatteryStatus)> batteryStatusChangeCallback = nullptr;
 
     static void monitorTask(void *pvParameters)
     {
@@ -141,7 +141,7 @@ private:
             {
                 if (batteryStatusChangeCallback)
                 {
-                    batteryStatusChangeCallback(status);
+                    batteryStatusChangeCallback(lastPublishedStatus, status);
                 }
                 Message message;
                 message.type = MessageType::BATTERY_STATUS;
@@ -190,7 +190,7 @@ public:
         xTaskCreate(BatteryMonitor::monitorTask, "Battery Monitor", 2048, this, 1, NULL);
     }
 
-    void onBatteryStatusChange(std::function<void(BatteryStatus)> callback)
+    void onBatteryStatusChange(std::function<void(BatteryStatus, BatteryStatus)> callback)
     {
         batteryStatusChangeCallback = callback;
     }

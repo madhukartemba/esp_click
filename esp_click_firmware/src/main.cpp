@@ -41,9 +41,9 @@ void setup()
   batteryMonitor.setVoltageDividerRatio(BoardConfig::VOLTAGE_DIVIDER_RATIO);
 
   batteryMonitor.onBatteryStatusChange(
-      [](BatteryStatus status)
+      [](BatteryStatus oldStatus, BatteryStatus newStatus)
       {
-        switch (status)
+        switch (newStatus)
         {
         case NOT_CONNECTED:
           Serial.println("NOT_CONNECTED");
@@ -55,7 +55,10 @@ void setup()
           break;
         case DISCHARGING:
           Serial.println("DISCHARGING");
-          myLed.set(LedMode::OFF);
+          if (oldStatus == BatteryStatus::CHARGING || oldStatus == BatteryStatus::FULL_CHARGED)
+          {
+            myLed.set(LedMode::OFF);
+          }
           break;
         case FULL_CHARGED:
           Serial.println("FULL_CHARGED");
