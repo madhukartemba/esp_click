@@ -74,6 +74,19 @@ void setup()
         }
       });
 
+  myLed.registerOnAnimEnd(
+      [](LedCommand cmd)
+      {
+        if (batteryMonitor.getBatteryStatus() == BatteryStatus::CHARGING)
+        {
+          myLed.set(LedMode::PULSE, Color::RED, LedSpeed::GLACIAL);
+        }
+        else if (batteryMonitor.getBatteryStatus() == BatteryStatus::FULL_CHARGED)
+        {
+          myLed.set(LedMode::SOLID, Color::GREEN);
+        }
+      });
+
   batteryMonitor.begin();
 
   EspNowController::getInstance().registerOnAfterSend(

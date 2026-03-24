@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include <functional> // <-- ADDED for std::function
 #include "SleepManager.h"
 
 enum Color
@@ -66,6 +67,10 @@ private:
     QueueHandle_t commandQueue;
     EventBits_t taskId;
 
+    // --- UPDATED: Callback variables ---
+    std::function<void()> animStartCallback = nullptr;
+    std::function<void(LedCommand)> animEndCallback = nullptr; // Now takes LedCommand
+
     static void ledTask(void *pvParameters)
     {
         AsyncLed *ledInstance = (AsyncLed *)pvParameters;
@@ -124,12 +129,10 @@ private:
         }
     }
 
-    // --- Helper 2: Write to hardware based on Anode/Cathode & Single/RGB ---
     void setHardwareColor(uint8_t r, uint8_t g, uint8_t b)
     {
         if (ledType == RGB)
         {
-            // Apply Common Anode inversion if needed
             uint8_t outR = (hardwareType == COMMON_ANODE) ? (255 - r) : r;
             uint8_t outG = (hardwareType == COMMON_ANODE) ? (255 - g) : g;
             uint8_t outB = (hardwareType == COMMON_ANODE) ? (255 - b) : b;
@@ -140,18 +143,17 @@ private:
         }
         else
         {
-            // For a single pin, extract brightness (max of r, g, b)
             uint8_t intensity = max({r, g, b});
             uint8_t outPin = (hardwareType == COMMON_ANODE) ? (255 - intensity) : intensity;
 
             analogWrite(pin, outPin);
         }
     }
-    // --- The Main Task Loop ---
+
     void run()
     {
         LedCommand currentCmd = {OFF, BLACK, MEDIUM, -1};
-        int currentCount = -1; // Tracks remaining cycles (-1 = infinite)
+        int currentCount = -1;
 
         // Animation state variables
         bool blinkState = false;
@@ -165,34 +167,31 @@ private:
         bool isFadingIn = false;
         float fadeInLevel = 0.0f;
 
+        // State trackers for callbacks
+        bool wasActive = false;
+        LedCommand lastActiveCmd = {OFF, BLACK, MEDIUM, -1}; // Tracks the last non-OFF state
+
         while (true)
         {
-            // --- 1. DETERMINE WAIT TIME & CHECK QUEUE ---
             LedCommand tempCmd;
             bool gotNewCmd = false;
 
-            // If we are actively fading, don't pull from the queue. Let the fade finish.
             if (isFadingOut || isFadingIn)
             {
-                vTaskDelay(pdMS_TO_TICKS(20)); // Fixed 20ms animation frame
+                vTaskDelay(pdMS_TO_TICKS(20));
             }
             else
             {
-                // If the LED is resting (OFF or SOLID), we sleep indefinitely to save CPU.
-                // If animating (BLINK or PULSE), we only wait 20ms.
                 TickType_t waitTime = (currentCmd.mode == OFF || currentCmd.mode == SOLID) ? portMAX_DELAY : pdMS_TO_TICKS(20);
 
-                // Check the queue. If no command arrives, this will timeout and act as our 20ms frame delay!
                 if (xQueueReceive(commandQueue, &tempCmd, waitTime) == pdTRUE)
                 {
                     gotNewCmd = true;
                 }
             }
 
-            // --- 2. SETUP TRANSITION ON NEW COMMAND ---
             if (gotNewCmd)
             {
-                // Figure out EXACTLY how bright the LED is at this microsecond
                 float currentBrightness = 0.0f;
                 if (currentCmd.mode == SOLID)
                     currentBrightness = 1.0f;
@@ -201,18 +200,16 @@ private:
                 else if (currentCmd.mode == PULSE)
                     currentBrightness = pulseLevel;
 
-                // If the LED is visibly on, we must fade it out first
                 if (fadeBetweenCommands && currentBrightness > 0.01f)
                 {
                     pendingCmd = tempCmd;
                     isFadingOut = true;
-                    fadeOutLevel = currentBrightness; // Start fading from EXACTLY where it is right now
+                    fadeOutLevel = currentBrightness;
                 }
                 else
                 {
-                    // If the LED is already black (or OFF), instantly swap to the new command
                     currentCmd = tempCmd;
-                    currentCount = currentCmd.count; // Capture the count
+                    currentCount = currentCmd.count;
                     blinkState = false;
                     pulseLevel = 0.0f;
                     pulseIncreasing = true;
@@ -229,23 +226,20 @@ private:
                 }
             }
 
-            // Get target RGB values for the active color
             uint8_t targetR, targetG, targetB;
             getColorValues(currentCmd.color, targetR, targetG, targetB);
             unsigned long currentMillis = millis();
 
-            // --- 3. EXECUTE ANIMATIONS & TRANSITIONS ---
             if (isFadingOut)
             {
-                float step = 20.0f / (float)currentCmd.speed; // Calculate fade step based on desired fade-out duration
+                float step = 20.0f / (float)currentCmd.speed;
                 fadeOutLevel -= step;
 
                 if (fadeOutLevel <= 0.0f)
                 {
-                    // Fade out complete! Swap to the pending command
                     isFadingOut = false;
                     currentCmd = pendingCmd;
-                    currentCount = currentCmd.count; // Capture the count from pending
+                    currentCount = currentCmd.count;
                     blinkState = false;
                     pulseLevel = 0.0f;
                     pulseIncreasing = true;
@@ -289,13 +283,12 @@ private:
                     blinkState = !blinkState;
                     setHardwareColor(blinkState ? targetR : 0, blinkState ? targetG : 0, blinkState ? targetB : 0);
 
-                    // If it just turned OFF, a full blink cycle is complete!
                     if (!blinkState && currentCount > 0)
                     {
                         currentCount--;
                         if (currentCount == 0)
                         {
-                            currentCmd.mode = OFF; // Finished!
+                            currentCmd.mode = OFF;
                         }
                     }
                 }
@@ -304,7 +297,6 @@ private:
             {
                 float step = 20.0f / (float)currentCmd.speed;
 
-                // End of a pulse cycle (hit the bottom)
                 if (pulseLevel <= 0.0f && !pulseIncreasing)
                 {
                     if (currentCount > 0)
@@ -312,18 +304,17 @@ private:
                         currentCount--;
                         if (currentCount == 0)
                         {
-                            currentCmd.mode = OFF; // Finished!
+                            currentCmd.mode = OFF;
                         }
                     }
 
-                    // Only bounce back up if we didn't just turn off
                     if (currentCmd.mode != OFF)
                     {
                         pulseIncreasing = true;
                     }
                 }
 
-                if (currentCmd.mode == PULSE) // Still pulsing
+                if (currentCmd.mode == PULSE)
                 {
                     if (pulseIncreasing)
                     {
@@ -346,10 +337,28 @@ private:
                 }
             }
 
+            // --- Existing Sleep Check ---
             if (currentCmd.mode == OFF && !isFadingOut && !isFadingIn)
             {
                 SleepManager::getInstance().allowSleep(this->taskId);
             }
+
+            // --- UPDATED: Callback Trigger Logic ---
+            bool isCurrentlyActive = !(currentCmd.mode == OFF && !isFadingOut && !isFadingIn);
+
+            if (isCurrentlyActive && !wasActive)
+            {
+                if (animStartCallback)
+                    animStartCallback();
+            }
+            else if (!isCurrentlyActive && wasActive)
+            {
+                if (animEndCallback)
+                    animEndCallback(lastActiveCmd); // Pass the recorded command!
+            }
+
+            wasActive = isCurrentlyActive;
+            lastActiveCmd = currentCmd;
         }
     }
 
@@ -360,14 +369,21 @@ public:
     void begin()
     {
         this->taskId = SleepManager::getInstance().registerTask();
-
         commandQueue = xQueueCreate(10, sizeof(LedCommand));
-
         xTaskCreate(AsyncLed::ledTask, "LED Task", 2048, this, 1, NULL);
     }
 
-    // Helper function for the main file to easily send commands for RGB
-    // 1. Full RGB Control: Mode + Color + (Optional) Speed
+    void registerOnAnimStart(std::function<void()> callback)
+    {
+        animStartCallback = callback;
+    }
+
+    // --- UPDATED: Callback Registration ---
+    void registerOnAnimEnd(std::function<void(LedCommand)> callback)
+    {
+        animEndCallback = callback;
+    }
+
     void set(LedMode mode, Color color, LedSpeed speed = MEDIUM)
     {
         SleepManager::getInstance().keepAwake(this->taskId);
@@ -375,8 +391,6 @@ public:
         xQueueSend(commandQueue, &cmd, 0);
     }
 
-    // 2. Single LED Control: Mode + Speed
-    // (Defaults to WHITE so the single pin gets 255/max brightness)
     void set(LedMode mode, LedSpeed speed)
     {
         SleepManager::getInstance().keepAwake(this->taskId);
@@ -384,7 +398,6 @@ public:
         xQueueSend(commandQueue, &cmd, 0);
     }
 
-    // 3. Simple Control: Just Mode
     void set(LedMode mode)
     {
         SleepManager::getInstance().keepAwake(this->taskId);
@@ -392,7 +405,6 @@ public:
         xQueueSend(commandQueue, &cmd, 0);
     }
 
-    // 4. Counted Control: Blink or Pulse X times!
     void set(LedMode mode, int count, Color color, LedSpeed speed = MEDIUM)
     {
         SleepManager::getInstance().keepAwake(this->taskId);
