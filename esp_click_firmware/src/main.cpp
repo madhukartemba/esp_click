@@ -6,7 +6,7 @@
 #include "SleepManager.h"
 #include "EspNowController.h"
 
-AsyncLed myLed(
+AsyncLed statusLed(
     BoardConfig::LED_PIN_R,
     BoardConfig::LED_PIN_G,
     BoardConfig::LED_PIN_B,
@@ -36,7 +36,7 @@ void setup()
 
   buttonManager.begin();
 
-  myLed.begin();
+  statusLed.begin();
 
   batteryMonitor.setVoltageDividerRatio(BoardConfig::VOLTAGE_DIVIDER_RATIO);
 
@@ -47,26 +47,26 @@ void setup()
         {
         case NOT_CONNECTED:
           Serial.println("NOT_CONNECTED");
-          myLed.set(LedMode::BLINK, 6, Color::RED);
+          statusLed.set(LedMode::BLINK, 6, Color::RED);
           break;
         case CHARGING:
           Serial.println("CHARGING");
-          myLed.set(LedMode::PULSE, Color::RED, LedSpeed::GLACIAL);
+          statusLed.set(LedMode::PULSE, Color::RED, LedSpeed::GLACIAL);
           break;
         case DISCHARGING:
           Serial.println("DISCHARGING");
           if (oldStatus != DISCHARGING)
           {
-            myLed.set(LedMode::OFF);
+            statusLed.set(LedMode::OFF);
           }
           break;
         case FULL_CHARGED:
           Serial.println("FULL_CHARGED");
-          myLed.set(LedMode::SOLID, Color::GREEN);
+          statusLed.set(LedMode::SOLID, Color::GREEN);
           break;
         case CHARGE_FAULT:
           Serial.println("CHARGE_FAULT");
-          myLed.set(LedMode::BLINK, 3, Color::RED);
+          statusLed.set(LedMode::BLINK, 3, Color::RED);
           break;
         default:
           Serial.println("UNKNOWN");
@@ -74,16 +74,16 @@ void setup()
         }
       });
 
-  myLed.registerOnAnimEnd(
+  statusLed.registerOnAnimEnd(
       [](LedCommand cmd)
       {
         if (batteryMonitor.getBatteryStatus() == BatteryStatus::CHARGING)
         {
-          myLed.set(LedMode::PULSE, Color::RED, LedSpeed::GLACIAL);
+          statusLed.set(LedMode::PULSE, Color::RED, LedSpeed::GLACIAL);
         }
         else if (batteryMonitor.getBatteryStatus() == BatteryStatus::FULL_CHARGED)
         {
-          myLed.set(LedMode::SOLID, Color::GREEN);
+          statusLed.set(LedMode::SOLID, Color::GREEN);
         }
       });
 
@@ -96,11 +96,11 @@ void setup()
         {
           if (success)
           {
-            myLed.set(LedMode::OFF);
+            statusLed.set(LedMode::OFF);
           }
           else
           {
-            myLed.set(LedMode::BLINK, 2, Color::RED);
+            statusLed.set(LedMode::BLINK, 2, Color::RED);
           }
         }
       });
@@ -111,13 +111,13 @@ void setup()
         if (message.type == MessageType::BUTTON_PRESS)
         {
           if (batteryMonitor.getBatteryLevel() <= BoardConfig::LOW_BATTERY_THRESHOLD)
-            myLed.set(LedMode::SOLID, Color::RED);
+            statusLed.set(LedMode::SOLID, Color::RED);
           else if (message.data.buttonPress.event == SINGLE_PRESS)
-            myLed.set(LedMode::SOLID, Color::WHITE);
+            statusLed.set(LedMode::SOLID, Color::WHITE);
           else if (message.data.buttonPress.event == DOUBLE_PRESS)
-            myLed.set(LedMode::SOLID, Color::GREEN);
+            statusLed.set(LedMode::SOLID, Color::GREEN);
           else if (message.data.buttonPress.event == LONG_PRESS)
-            myLed.set(LedMode::SOLID, Color::BLUE);
+            statusLed.set(LedMode::SOLID, Color::BLUE);
         }
       });
 
