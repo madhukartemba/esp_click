@@ -22,19 +22,19 @@ Button button2(BoardConfig::BTN2_PIN, INPUT, true);
 Button button3(BoardConfig::BTN3_PIN, INPUT, true);
 Button button4(BoardConfig::BTN4_PIN, INPUT, true);
 
-ButtonManager buttonManger;
+ButtonManager buttonManager;
 
 void setup()
 {
   Serial.begin(9600);
   SleepManager::getInstance().begin();
 
-  buttonManger.registerButton(&button1);
-  buttonManger.registerButton(&button2);
-  buttonManger.registerButton(&button3);
-  buttonManger.registerButton(&button4);
+  buttonManager.registerButton(&button1);
+  buttonManager.registerButton(&button2);
+  buttonManager.registerButton(&button3);
+  buttonManager.registerButton(&button4);
 
-  buttonManger.begin();
+  buttonManager.begin();
 
   myLed.begin();
 
@@ -47,7 +47,7 @@ void setup()
         {
         case NOT_CONNECTED:
           Serial.println("NOT_CONNECTED");
-          myLed.set(LedMode::SOLID, 6, Color::RED);
+          myLed.set(LedMode::BLINK, 6, Color::RED);
           break;
         case CHARGING:
           Serial.println("CHARGING");
