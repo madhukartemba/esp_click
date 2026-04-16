@@ -8,6 +8,9 @@
 #if defined(ENABLE_ESP_NOW)
 #include "EspNowController.h"
 #endif
+#if defined(ENABLE_ZIGBEE)
+#include "ZigbeeController.h"
+#endif
 #include "BleController.h"
 
 AsyncLed statusLed(
@@ -40,6 +43,9 @@ void setup()
 
 #if defined(ENABLE_ESP_NOW)
   buttonManager.registerMessageSink(&EspNowController::getInstance());
+#endif
+#if defined(ENABLE_ZIGBEE)
+  buttonManager.registerMessageSink(&ZigbeeController::getInstance());
 #endif
   buttonManager.registerMessageSink(&BleController::getInstance());
 
@@ -135,6 +141,10 @@ void setup()
 #endif
 
   BleController::getInstance().begin("ESP-Click");
+
+#if defined(ENABLE_ZIGBEE)
+  ZigbeeController::getInstance().begin("Espressif", "ESP-Click-ZB");
+#endif
 }
 
 void loop() {}
