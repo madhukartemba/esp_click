@@ -3,8 +3,7 @@
 #include <esp_wifi.h>
 #include <Arduino.h>
 #include <esp_now.h>
-#include "SleepManager.h"
-#include "Message.h"
+#include "BaseController.h"
 
 struct LastSendNode
 {
@@ -25,12 +24,9 @@ BestNode bestFoundNode = {{0}, 0, -127, false};
 
 RTC_DATA_ATTR LastSendNode lastSendNode;
 
-class EspNowController
+class EspNowController : public BaseController
 {
 private:
-    QueueHandle_t messageQueue;
-    EventBits_t taskId;
-
     static EspNowController *s_instance;
 
     volatile bool appAckReceived = false;
@@ -46,12 +42,6 @@ private:
 
     EspNowController() {}
     ~EspNowController() {}
-
-    static void controllerTask(void *pvParameters)
-    {
-        EspNowController *instance = (EspNowController *)pvParameters;
-        instance->run();
-    }
 
     static void IRAM_ATTR binRecvCb(const esp_now_recv_info_t *info, const uint8_t *incomingData, int len)
     {
@@ -89,7 +79,7 @@ private:
         }
     }
 
-    void run()
+    void run() override
     {
         bool initSuccessful = initEspNow();
 
@@ -278,19 +268,7 @@ public:
 
         s_instance = this;
 
-        this->messageQueue = xQueueCreate(10, sizeof(Message));
-        this->taskId = SleepManager::getInstance().registerTask();
-
-        xTaskCreate(EspNowController::controllerTask, "ESP-NOW Task", 4096, this, 1, NULL);
-    }
-
-    void addMessage(Message message)
-    {
-        if (messageQueue != NULL)
-        {
-            SleepManager::getInstance().keepAwake(this->taskId);
-            xQueueSend(messageQueue, &message, 0);
-        }
+        startControllerTask("ESP-NOW Task", 4096, 1, 10);
     }
 
     void registerOnBeforeSend(std::function<void(Message)> callback)
