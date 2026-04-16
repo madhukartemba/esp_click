@@ -4,10 +4,7 @@
 #include "Button.h"
 #include "ButtonManager.h"
 #include "SleepManager.h"
-// #define ENABLE_ESP_NOW 1
-#if defined(ENABLE_ESP_NOW)
 #include "EspNowController.h"
-#endif
 #include "BleController.h"
 
 AsyncLed statusLed(
@@ -38,9 +35,7 @@ void setup()
   buttonManager.registerButton(&button3);
   buttonManager.registerButton(&button4);
 
-#if defined(ENABLE_ESP_NOW)
   buttonManager.registerMessageSink(&EspNowController::getInstance());
-#endif
   buttonManager.registerMessageSink(&BleController::getInstance());
 
   buttonManager.begin();
@@ -98,7 +93,6 @@ void setup()
 
   batteryMonitor.begin();
 
-#if defined(ENABLE_ESP_NOW)
   EspNowController::getInstance().registerOnAfterSend(
       [](Message message, bool success)
       {
@@ -132,7 +126,6 @@ void setup()
       });
 
   EspNowController::getInstance().begin();
-#endif
 
   BleController::getInstance().begin("ESP-Click");
 }
