@@ -5,7 +5,6 @@
 #include "ButtonManager.h"
 #include "SleepManager.h"
 #include "EspNowController.h"
-#include "BleController.h"
 
 AsyncLed statusLed(
     BoardConfig::LED_PIN_R,
@@ -36,7 +35,6 @@ void setup()
   buttonManager.registerButton(&button4);
 
   buttonManager.registerMessageSink(&EspNowController::getInstance());
-  buttonManager.registerMessageSink(&BleController::getInstance());
 
   buttonManager.begin();
 
@@ -127,7 +125,6 @@ void setup()
 
   EspNowController::getInstance().begin();
 
-  BleController::getInstance().begin("ESP-Click");
 }
 
 void loop() {}
