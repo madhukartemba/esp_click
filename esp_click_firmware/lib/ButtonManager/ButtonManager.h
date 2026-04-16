@@ -1,8 +1,9 @@
 #pragma once
 #include <Arduino.h>
+#include <vector>
 #include "Button.h"
 #include "SleepManager.h"
-#include "EspNowController.h"
+#include "BaseController.h"
 #include "PressEvent.h"
 #include "Message.h"
 
@@ -17,6 +18,7 @@ class ButtonManager
 private:
     int buttonCount = 0;
     std::vector<Button *> buttons;
+    std::vector<BaseController *> messageSinks;
 
     EventBits_t taskId;
 
@@ -39,7 +41,10 @@ private:
                     message.type = MessageType::BUTTON_PRESS;
                     message.data.buttonPress.buttonId = button->getPin();
                     message.data.buttonPress.event = button->getEvent();
-                    EspNowController::getInstance().addMessage(message);
+                    for (BaseController *sink : messageSinks)
+                    {
+                        sink->addMessage(message);
+                    }
                 }
             }
             vTaskDelay(pdMS_TO_TICKS(10));
@@ -71,6 +76,11 @@ public:
                     SleepManager::getInstance().allowSleep(this->taskId);
                 }
             });
+    }
+
+    void registerMessageSink(BaseController *controller)
+    {
+        messageSinks.push_back(controller);
     }
 
 };
