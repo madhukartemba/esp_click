@@ -6,7 +6,9 @@ enum MessageType
 {
     BUTTON_PRESS,
     BATTERY_STATUS,
-    DISCOVERY_REQUEST
+    DISCOVERY_REQUEST,
+    PAIRING_REQUEST, // NEW: Sender -> Receiver
+    PAIRING_RESPONSE // NEW: Receiver -> Sender
 };
 
 // Application-level ACK structure MUST be packed
@@ -35,5 +37,11 @@ struct __attribute__((packed)) Message
             int level;
             BatteryStatus status;
         } batteryLevel;
+
+        struct
+        {
+            size_t keyLen;
+            uint8_t publicKey[65];
+        } pairing;
     } data;
 };
