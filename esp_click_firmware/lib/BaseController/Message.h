@@ -45,3 +45,13 @@ struct __attribute__((packed)) Message
         } pairing;
     } data;
 };
+
+#define AES_IV_LENGTH 12
+#define AES_TAG_LENGTH 16
+
+struct __attribute__((packed)) EncryptedPacket
+{
+    uint8_t iv[AES_IV_LENGTH];
+    uint8_t ciphertext[sizeof(Message)];
+    uint8_t tag[AES_TAG_LENGTH];
+};
