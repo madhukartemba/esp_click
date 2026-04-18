@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <esp_wifi.h>
 #include <Arduino.h>
+#include <Preferences.h>
 #include <esp_now.h>
 #include "BaseController.h"
 #include "Message.h" // Ensure this includes the EncryptedPacket struct
@@ -32,6 +33,23 @@ BestNode bestFoundNode = {{0}, 0, -127, false};
 RTC_DATA_ATTR LastSendNode lastSendNode;
 RTC_DATA_ATTR uint8_t sharedEncryptionKey[16] = {0}; // The final AES key
 RTC_DATA_ATTR bool isPaired = false;                 // Tracks if we have exchanged keys
+
+// NVS: AES key + paired flag only; saved once when pairing succeeds
+namespace PairingNvs
+{
+    static constexpr const char *kNs = "enow";
+    static constexpr const char *kBlob = "p";
+    static constexpr uint32_t kMagic = 0x4E574B31;
+    static constexpr uint16_t kVersion = 1;
+
+    struct __attribute__((packed)) Blob
+    {
+        uint32_t magic;
+        uint16_t version;
+        uint8_t sharedEncryptionKey[16];
+        uint8_t isPaired;
+    };
+}
 
 class EspNowController : public BaseController
 {
@@ -255,6 +273,7 @@ private:
             Serial.println("App-level ACK wait failed, marking node as unknown");
             lastSendNode.isNodeKnown = false;
         }
+
         return ackResult;
     }
 
@@ -379,6 +398,54 @@ private:
         return true;
     }
 
+    void loadPairingFromPrefs()
+    {
+        Preferences prefs;
+        if (!prefs.begin(PairingNvs::kNs, true))
+        {
+            Serial.println("Pairing NVS: failed to open namespace for read");
+            return;
+        }
+
+        PairingNvs::Blob blob{};
+        const size_t n = prefs.getBytes(PairingNvs::kBlob, &blob, sizeof(blob));
+        prefs.end();
+
+        if (n != sizeof(blob) || blob.magic != PairingNvs::kMagic || blob.version != PairingNvs::kVersion)
+        {
+            return;
+        }
+
+        memcpy(sharedEncryptionKey, blob.sharedEncryptionKey, sizeof(sharedEncryptionKey));
+        isPaired = blob.isPaired != 0;
+
+        Serial.println("Pairing NVS: restored key");
+    }
+
+    void savePairingToPrefs()
+    {
+        PairingNvs::Blob blob{};
+        blob.magic = PairingNvs::kMagic;
+        blob.version = PairingNvs::kVersion;
+        memcpy(blob.sharedEncryptionKey, sharedEncryptionKey, sizeof(blob.sharedEncryptionKey));
+        blob.isPaired = isPaired ? 1 : 0;
+
+        Preferences prefs;
+        if (!prefs.begin(PairingNvs::kNs, false))
+        {
+            Serial.println("Pairing NVS: failed to open namespace for write");
+            return;
+        }
+
+        const size_t w = prefs.putBytes(PairingNvs::kBlob, &blob, sizeof(blob));
+        prefs.end();
+
+        if (w != sizeof(blob))
+        {
+            Serial.println("Pairing NVS: write failed");
+        }
+    }
+
     bool pairDevice()
     {
         mbedtls_ecdh_context ecdh;
@@ -479,7 +546,8 @@ private:
                 {
                     memcpy(sharedEncryptionKey, shared_secret, 16);
                     isPaired = true;
-                    Serial.println("Pairing SUCCESS! Shared AES key established and saved to RTC.");
+                    savePairingToPrefs();
+                    Serial.println("Pairing SUCCESS! Shared AES key established and saved to NVS.");
                 }
                 else
                 {
@@ -519,6 +587,8 @@ public:
         s_instance = this;
 
         this->pairingButtonId = pairingButtonId;
+
+        loadPairingFromPrefs();
 
         startControllerTask("ESP-NOW Task", 16384, 1, 10);
     }
