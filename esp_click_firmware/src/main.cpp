@@ -128,7 +128,7 @@ void setup()
   EspNowController::getInstance().registerOnPairingInit(
       []()
       {
-        statusLed.set(LedMode::PULSE, Color::YELLOW);
+        statusLed.set(LedMode::PULSE, Color::MAGENTA);
       });
 
   EspNowController::getInstance().registerOnPairingComplete(
