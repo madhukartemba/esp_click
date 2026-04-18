@@ -509,7 +509,7 @@ public:
 
         for (uint8_t attempt = 1; attempt <= pairingRetryCount + 1; attempt++)
         {
-            Serial.printf("Pairing Attempt %d of %d\n", attempt, pairingRetryCount);
+            Serial.printf("Pairing Attempt %d of %d\n", attempt, pairingRetryCount + 1);
             if (pairDevice())
             {
                 break;
