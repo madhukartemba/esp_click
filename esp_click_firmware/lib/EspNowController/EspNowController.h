@@ -4,6 +4,8 @@
 #include <Arduino.h>
 #include <Preferences.h>
 #include <esp_now.h>
+#include <esp_random.h>
+#include <cstring>
 #include "BaseController.h"
 #include "Message.h" // Ensure this includes the EncryptedPacket struct
 
@@ -33,6 +35,35 @@ BestNode bestFoundNode = {{0}, 0, -127, false};
 RTC_DATA_ATTR LastSendNode lastSendNode;
 RTC_DATA_ATTR uint8_t sharedEncryptionKey[16] = {0}; // The final AES key
 RTC_DATA_ATTR bool isPaired = false;                 // Tracks if we have exchanged keys
+RTC_DATA_ATTR uint64_t rtcSessionId = 0;             // Current crypto session; 0 when unpaired
+
+namespace SessionIdHistory
+{
+    constexpr size_t kMax = 8;
+    uint64_t g_ids[kMax];
+    size_t g_len = 0;
+
+    bool contains(uint64_t id)
+    {
+        for (size_t i = 0; i < g_len; i++)
+        {
+            if (g_ids[i] == id)
+                return true;
+        }
+        return false;
+    }
+
+    void push(uint64_t id)
+    {
+        if (g_len < kMax)
+        {
+            g_ids[g_len++] = id;
+            return;
+        }
+        memmove(g_ids, g_ids + 1, (kMax - 1) * sizeof(uint64_t));
+        g_ids[kMax - 1] = id;
+    }
+} // namespace SessionIdHistory
 
 // NVS: AES key + paired flag only; saved once when pairing succeeds
 namespace PairingNvs
@@ -79,6 +110,34 @@ private:
 
     EspNowController() {}
     ~EspNowController() {}
+
+    void initSessionIdForBoot()
+    {
+        if (!isPaired)
+        {
+            rtcSessionId = 0;
+            return;
+        }
+
+        for (int attempt = 0; attempt < 32; attempt++)
+        {
+            uint64_t candidate = 0;
+            esp_fill_random(&candidate, sizeof(candidate));
+            if (candidate == 0 || SessionIdHistory::contains(candidate))
+                continue;
+            rtcSessionId = candidate;
+            SessionIdHistory::push(rtcSessionId);
+            return;
+        }
+
+        uint64_t fallback = (uint64_t)esp_random() | ((uint64_t)esp_random() << 32);
+        if (fallback == 0)
+            fallback = 1;
+        while (SessionIdHistory::contains(fallback))
+            ++fallback;
+        rtcSessionId = fallback;
+        SessionIdHistory::push(rtcSessionId);
+    }
 
     static void IRAM_ATTR binRecvCb(const esp_now_recv_info_t *info, const uint8_t *incomingData, int len)
     {
@@ -171,18 +230,13 @@ private:
     }
 
     // ==========================================
-    // NEW: AES-GCM Helpers
+    // AES-GCM Helpers
     // ==========================================
-    void generate_iv(uint8_t *iv, uint32_t counter)
+    // 12-byte GCM nonce: sessionId (8, LE) + counter (4, LE). Unique per (sessionId, counter) for a given key.
+    void generate_iv(uint8_t *iv, uint32_t counter, uint64_t sessionId)
     {
-        uint8_t mac[6];
-        esp_wifi_get_mac(WIFI_IF_STA, mac);
-
-        // IV = Sender MAC (6 bytes) + Message Counter (4 bytes) + Padding (2 bytes)
-        memcpy(&iv[0], mac, 6);
-        memcpy(&iv[6], &counter, sizeof(counter));
-        iv[10] = 0x00;
-        iv[11] = 0x00;
+        memcpy(&iv[0], &sessionId, sizeof(sessionId));
+        memcpy(&iv[8], &counter, sizeof(counter));
     }
 
     bool encrypt_message(const Message *plaintext_msg, EncryptedPacket *out_packet)
@@ -197,7 +251,7 @@ private:
             return false;
         }
 
-        generate_iv(out_packet->iv, plaintext_msg->counter);
+        generate_iv(out_packet->iv, plaintext_msg->counter, plaintext_msg->sessionId);
 
         int ret = mbedtls_gcm_crypt_and_tag(
             &gcm,
@@ -230,6 +284,8 @@ private:
             Serial.println("Cannot broadcast discovery: Device is not paired.");
             return false;
         }
+
+        message->sessionId = rtcSessionId;
 
         Serial.printf("Targeting known node on channel %d\n", lastSendNode.lastChannel);
 
@@ -300,9 +356,10 @@ private:
 
         esp_now_add_peer(&bcPeer);
 
-        Message pingMsg;
+        Message pingMsg{};
         pingMsg.deviceId = 0;
         pingMsg.type = DISCOVERY_REQUEST;
+        pingMsg.sessionId = rtcSessionId;
 
         for (int i = 1; i <= 13; i++)
         {
@@ -485,10 +542,11 @@ private:
             return false;
         }
 
-        // 3. Prepare the Pairing Request Message
-        Message pairingMsg;
+        // 3. Prepare the Pairing Request Message (plaintext; sessionId must stay 0)
+        Message pairingMsg{};
         pairingMsg.type = PAIRING_REQUEST;
         pairingMsg.counter = ++messageCounter;
+        pairingMsg.sessionId = 0;
 
         // 4. Generate Key Pair
         size_t olen = 0;
@@ -547,6 +605,7 @@ private:
                     memcpy(sharedEncryptionKey, shared_secret, 16);
                     isPaired = true;
                     savePairingToPrefs();
+                    initSessionIdForBoot();
                     Serial.println("Pairing SUCCESS! Shared AES key established and saved to NVS.");
                 }
                 else
@@ -589,6 +648,7 @@ public:
         this->pairingButtonId = pairingButtonId;
 
         loadPairingFromPrefs();
+        initSessionIdForBoot();
 
         startControllerTask("ESP-NOW Task", 16384, 1, 10);
     }
