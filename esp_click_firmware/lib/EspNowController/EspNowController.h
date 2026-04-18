@@ -186,6 +186,14 @@ private:
 
     bool sendMessageToKnownNode(Message *message)
     {
+
+        // STRICT GUARD: Do not allow unencrypted messages to known nodes if we are not paired
+        if (!isPaired)
+        {
+            Serial.println("Cannot broadcast discovery: Device is not paired.");
+            return false;
+        }
+
         Serial.printf("Targeting known node on channel %d\n", lastSendNode.lastChannel);
 
         esp_wifi_set_channel(lastSendNode.lastChannel, WIFI_SECOND_CHAN_NONE);
@@ -205,25 +213,16 @@ private:
         expectedMessageId = message->counter;
         appAckReceived = false;
 
-        // --- ENCRYPT AND SEND ---
-        if (isPaired)
+        EncryptedPacket encPacket;
+        if (encrypt_message(message, &encPacket))
         {
-            EncryptedPacket encPacket;
-            if (encrypt_message(message, &encPacket))
-            {
-                esp_now_send(lastSendNode.targetMAC, (uint8_t *)&encPacket, sizeof(EncryptedPacket));
-            }
-            else
-            {
-                Serial.println("Aborting send due to encryption failure.");
-                esp_now_del_peer(lastSendNode.targetMAC);
-                return false;
-            }
+            esp_now_send(lastSendNode.targetMAC, (uint8_t *)&encPacket, sizeof(EncryptedPacket));
         }
         else
         {
-            // Fallback (e.g. for pings before pairing is strictly enforced)
-            esp_now_send(lastSendNode.targetMAC, (uint8_t *)message, sizeof(Message));
+            Serial.println("Aborting send due to encryption failure.");
+            esp_now_del_peer(lastSendNode.targetMAC);
+            return false;
         }
 
         bool ackResult = waitForAck();
@@ -240,7 +239,14 @@ private:
 
     bool findNodeViaBroadcast()
     {
-        Serial.println("Broadcasting DISCOVERY ping (sweeping channels)...");
+        // STRICT GUARD: Do not allow unencrypted discovery broadcasts
+        if (!isPaired)
+        {
+            Serial.println("Cannot broadcast discovery: Device is not paired.");
+            return false;
+        }
+
+        Serial.println("Broadcasting ENCRYPTED DISCOVERY ping (sweeping channels)...");
         uint8_t broadcastMAC[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
         bestFoundNode = {{0}, 0, -127, false};
@@ -266,7 +272,16 @@ private:
             pingMsg.counter = ++messageCounter;
             expectedMessageId = pingMsg.counter;
 
-            esp_now_send(broadcastMAC, (uint8_t *)&pingMsg, sizeof(Message));
+            EncryptedPacket encPing;
+            if (encrypt_message(&pingMsg, &encPing))
+            {
+                esp_now_send(broadcastMAC, (uint8_t *)&encPing, sizeof(EncryptedPacket));
+            }
+            else
+            {
+                Serial.println("Failed to encrypt discovery ping. Skipping transmission.");
+            }
+
             vTaskDelay(pdMS_TO_TICKS(50));
         }
 
@@ -289,21 +304,17 @@ private:
 
     bool sendMessage(Message *message)
     {
+
+        if (!isPaired)
+        {
+            Serial.println("Device is not paired. Cannot send messages to known nodes without pairing.");
+            return false;
+        }
+
         if (!lastSendNode.isNodeKnown && !findNodeViaBroadcast())
         {
             Serial.println("Failed to find any Presence Nodes via broadcast sweep");
             return false;
-        }
-
-        // NEW: Enforce pairing before attempting to send normal data
-        if (!isPaired)
-        {
-            Serial.println("Node is known but not paired. Initiating key exchange...");
-            if (!initiatePairing())
-            {
-                Serial.println("Pairing failed. Cannot send encrypted message.");
-                return false;
-            }
         }
 
         if (sendMessageToKnownNode(message))
