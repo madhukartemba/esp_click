@@ -43,6 +43,9 @@ private:
     volatile uint8_t currentSweepChannel = 0;
     uint32_t messageCounter = 0;
 
+    // Pairing Retry Count
+    uint8_t pairingRetryCount = 3;
+
     volatile bool pairingResponseReceived = false;
     uint8_t peerPublicKey[65];
     size_t peerPublicKeyLen = 0;
@@ -374,34 +377,8 @@ private:
         return true;
     }
 
-public:
-    static EspNowController &getInstance()
+    bool pairDevice()
     {
-        static EspNowController instance;
-        return instance;
-    }
-
-    EspNowController(const EspNowController &) = delete;
-    EspNowController &operator=(const EspNowController &) = delete;
-
-    void begin(uint8_t pairingButtonId)
-    {
-        WiFi.mode(WIFI_STA);
-        WiFi.disconnect();
-
-        s_instance = this;
-
-        this->pairingButtonId = pairingButtonId;
-
-        startControllerTask("ESP-NOW Task", 4096, 1, 10);
-    }
-
-    bool initiatePairing()
-    {
-        Serial.println("Initiating ECDH Key Exchange...");
-        if (onPairingInit)
-            onPairingInit();
-
         mbedtls_ecdh_context ecdh;
         mbedtls_ctr_drbg_context ctr_drbg;
         mbedtls_entropy_context entropy;
@@ -499,11 +476,59 @@ public:
         mbedtls_ctr_drbg_free(&ctr_drbg);
         mbedtls_entropy_free(&entropy);
 
+        return isPaired;
+    }
+
+public:
+    static EspNowController &getInstance()
+    {
+        static EspNowController instance;
+        return instance;
+    }
+
+    EspNowController(const EspNowController &) = delete;
+    EspNowController &operator=(const EspNowController &) = delete;
+
+    void begin(uint8_t pairingButtonId)
+    {
+        WiFi.mode(WIFI_STA);
+        WiFi.disconnect();
+
+        s_instance = this;
+
+        this->pairingButtonId = pairingButtonId;
+
+        startControllerTask("ESP-NOW Task", 4096, 1, 10);
+    }
+
+    bool initiatePairing()
+    {
+        Serial.println("Initiating ECDH Key Exchange...");
+        if (onPairingInit)
+            onPairingInit();
+
+        for (uint8_t attempt = 1; attempt <= pairingRetryCount + 1; attempt++)
+        {
+            Serial.printf("Pairing Attempt %d of %d\n", attempt, pairingRetryCount);
+            if (pairDevice())
+            {
+                break;
+            }
+            else
+            {
+                Serial.println("Pairing attempt failed. Retrying...");
+                vTaskDelay(pdMS_TO_TICKS(2000));
+            }
+        }
+
         if (onPairingComplete)
             onPairingComplete(isPaired);
 
         return isPaired;
     }
+
+    void setPairingRetryCount(uint8_t count) { pairingRetryCount = count; }
+    uint8_t getPairingRetryCount() { return pairingRetryCount; }
 
     void registerOnBeforeSend(std::function<void(Message)> callback) { this->onBeforeSend = callback; }
     void registerOnAfterSend(std::function<void(Message, bool)> callback) { this->onAfterSend = callback; }
