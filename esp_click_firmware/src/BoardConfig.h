@@ -21,4 +21,7 @@ namespace BoardConfig
     constexpr uint8_t BTN3_PIN = 2;
     constexpr uint8_t BTN4_PIN = 3;
 
+    // Pairing Mode Pin
+    constexpr uint8_t PAIRING_MODE_PIN = 9; // GPIO9 is used to trigger pairing mode on boot when held LOW
+
 }

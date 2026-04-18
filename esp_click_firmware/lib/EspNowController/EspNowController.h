@@ -51,6 +51,10 @@ private:
 
     std::function<void(Message)> onBeforeSend = nullptr;
     std::function<void(Message, bool)> onAfterSend = nullptr;
+    std::function<void()> onPairingInit = nullptr;
+    std::function<void(bool)> onPairingComplete = nullptr;
+
+    uint8_t pairingButtonId = -1;
 
     EspNowController() {}
     ~EspNowController() {}
@@ -118,6 +122,18 @@ private:
             Message message;
             if (xQueueReceive(messageQueue, &message, portMAX_DELAY))
             {
+
+                // Check if it's the pairing button triggering the message
+                if (message.type == MessageType::BUTTON_PRESS &&
+                    message.data.buttonPress.buttonId == pairingButtonId)
+                {
+                    if (message.data.buttonPress.event == LONG_PRESS)
+                    {
+                        initiatePairing();
+                    }
+                    continue;
+                }
+
                 message.counter = ++messageCounter;
 
                 if (onBeforeSend)
@@ -326,8 +342,6 @@ private:
         Serial.println("Failed to send to known node, broadcasting again to rediscover");
         if (findNodeViaBroadcast())
         {
-            if (!isPaired && !initiatePairing())
-                return false;
             return sendMessageToKnownNode(message);
         }
 
@@ -370,12 +384,14 @@ public:
     EspNowController(const EspNowController &) = delete;
     EspNowController &operator=(const EspNowController &) = delete;
 
-    void begin()
+    void begin(uint8_t pairingButtonId)
     {
         WiFi.mode(WIFI_STA);
         WiFi.disconnect();
 
         s_instance = this;
+
+        this->pairingButtonId = pairingButtonId;
 
         startControllerTask("ESP-NOW Task", 4096, 1, 10);
     }
@@ -383,6 +399,8 @@ public:
     bool initiatePairing()
     {
         Serial.println("Initiating ECDH Key Exchange...");
+        if (onPairingInit)
+            onPairingInit();
 
         mbedtls_ecdh_context ecdh;
         mbedtls_ctr_drbg_context ctr_drbg;
@@ -481,11 +499,16 @@ public:
         mbedtls_ctr_drbg_free(&ctr_drbg);
         mbedtls_entropy_free(&entropy);
 
+        if (onPairingComplete)
+            onPairingComplete(isPaired);
+
         return isPaired;
     }
 
     void registerOnBeforeSend(std::function<void(Message)> callback) { this->onBeforeSend = callback; }
     void registerOnAfterSend(std::function<void(Message, bool)> callback) { this->onAfterSend = callback; }
+    void registerOnPairingInit(std::function<void()> callback) { this->onPairingInit = callback; }
+    void registerOnPairingComplete(std::function<void(bool)> callback) { this->onPairingComplete = callback; }
 };
 
 EspNowController *EspNowController::s_instance = nullptr;

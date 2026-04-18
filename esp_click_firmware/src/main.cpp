@@ -21,6 +21,7 @@ Button button1(BoardConfig::BTN1_PIN, INPUT, true);
 Button button2(BoardConfig::BTN2_PIN, INPUT, true);
 Button button3(BoardConfig::BTN3_PIN, INPUT, true);
 Button button4(BoardConfig::BTN4_PIN, INPUT, true);
+Button pairingButton(BoardConfig::PAIRING_MODE_PIN, INPUT_PULLUP, true);
 
 ButtonManager buttonManager;
 
@@ -33,6 +34,7 @@ void setup()
   buttonManager.registerButton(&button2);
   buttonManager.registerButton(&button3);
   buttonManager.registerButton(&button4);
+  buttonManager.registerButton(&pairingButton);
 
   buttonManager.registerMessageSink(&EspNowController::getInstance());
 
@@ -123,8 +125,7 @@ void setup()
         }
       });
 
-  EspNowController::getInstance().begin();
-
+  EspNowController::getInstance().begin(BoardConfig::PAIRING_MODE_PIN);
 }
 
 void loop() {}
