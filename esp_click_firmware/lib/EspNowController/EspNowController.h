@@ -72,6 +72,9 @@ private:
 
     void onDataReceived(const esp_now_recv_info_t *info, const uint8_t *incomingData, int len)
     {
+        Serial.println("Received ESP-NOW packet!");
+
+        // First check if it's an ACK for a message we sent
         if (len == sizeof(AckMessage))
         {
             AckMessage *ack = (AckMessage *)incomingData;
@@ -135,9 +138,6 @@ private:
                 }
                 else
                 {
-
-                    message.counter = ++messageCounter;
-
                     if (onBeforeSend)
                         onBeforeSend(message);
 
@@ -228,6 +228,8 @@ private:
             Serial.println("Failed to add peer");
             return false;
         }
+
+        message->counter = ++messageCounter;
 
         expectedMessageId = message->counter;
         appAckReceived = false;
@@ -387,14 +389,32 @@ private:
         mbedtls_ctr_drbg_init(&ctr_drbg);
         mbedtls_entropy_init(&entropy);
 
+        // A neat C++ Lambda to handle memory cleanup before we return
+        auto cleanup = [&]()
+        {
+            mbedtls_ecdh_free(&ecdh);
+            mbedtls_ctr_drbg_free(&ctr_drbg);
+            mbedtls_entropy_free(&entropy);
+        };
+
+        int ret = 0;
+
         // 1. Seed the random number generator
         const char *pers = "esp_click_pairing";
-        mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *)pers, strlen(pers));
-
-        // 2. Setup the ECDH context with the SECP256R1 Curve (mbedTLS 3.x API)
-        if (mbedtls_ecdh_setup(&ecdh, MBEDTLS_ECP_DP_SECP256R1) != 0)
+        ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *)pers, strlen(pers));
+        if (ret != 0)
         {
-            Serial.println("Failed to setup ECDH context");
+            Serial.printf("Failed to seed RNG. Error: -0x%04X\n", -ret);
+            cleanup();
+            return false;
+        }
+
+        // 2. Setup the ECDH context
+        ret = mbedtls_ecdh_setup(&ecdh, MBEDTLS_ECP_DP_CURVE25519);
+        if (ret != 0)
+        {
+            Serial.printf("Failed to setup ECDH context. Error: -0x%04X\n", -ret);
+            cleanup();
             return false;
         }
 
@@ -403,18 +423,20 @@ private:
         pairingMsg.type = PAIRING_REQUEST;
         pairingMsg.counter = ++messageCounter;
 
-        // 4. Generate Key Pair AND write the public key directly to our message buffer (mbedTLS 3.x API)
+        // 4. Generate Key Pair
         size_t olen = 0;
-        if (mbedtls_ecdh_make_public(&ecdh, &olen, pairingMsg.data.pairing.publicKey, 65, mbedtls_ctr_drbg_random, &ctr_drbg) != 0)
+        ret = mbedtls_ecdh_make_public(&ecdh, &olen, pairingMsg.data.pairing.publicKey, 65, mbedtls_ctr_drbg_random, &ctr_drbg);
+        if (ret != 0)
         {
-            Serial.println("Failed to generate public key");
+            Serial.printf("Failed to generate public key. Error: -0x%04X\n", -ret);
+            cleanup();
             return false;
         }
         pairingMsg.data.pairing.keyLen = olen;
 
         pairingResponseReceived = false;
 
-        // 5. Broadcast the public key across all channels
+        // 5. Broadcast the public key across all channels and wait
         uint8_t broadcastMAC[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
         esp_now_peer_info_t bcPeer = {};
         memcpy(bcPeer.peer_addr, broadcastMAC, 6);
@@ -423,47 +445,50 @@ private:
         bcPeer.ifidx = WIFI_IF_STA;
         esp_now_add_peer(&bcPeer);
 
+        Serial.println("Broadcasting Public Key. Sweeping channels...");
         for (int i = 1; i <= 13; i++)
         {
             esp_wifi_set_channel(i, WIFI_SECOND_CHAN_NONE);
             esp_now_send(broadcastMAC, (uint8_t *)&pairingMsg, sizeof(Message));
-            vTaskDelay(pdMS_TO_TICKS(50));
+
+            // Wait long enough ON THIS CHANNEL for the receiver to compute ECDH (~260ms) and reply
+            unsigned long startWait = millis();
+            while (!pairingResponseReceived && millis() - startWait < 500)
+            {
+                vTaskDelay(pdMS_TO_TICKS(10));
+            }
+
+            if (pairingResponseReceived)
+            {
+                Serial.printf("Receiver found and responded on channel %d!\n", i);
+                break; // Stop sweeping, we got our response!
+            }
         }
         esp_now_del_peer(broadcastMAC);
-
-        // 6. Wait for a receiver to respond with their public key
-        Serial.println("Public key broadcasted. Waiting for Receiver response...");
-        unsigned long start = millis();
-        while (!pairingResponseReceived && millis() - start < 3000)
-        {
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
 
         // 7. Compute Shared Secret
         if (pairingResponseReceived)
         {
-            // Read the Receiver's public key point (mbedTLS 3.x API)
-            if (mbedtls_ecdh_read_public(&ecdh, peerPublicKey, peerPublicKeyLen) == 0)
+            ret = mbedtls_ecdh_read_public(&ecdh, peerPublicKey, peerPublicKeyLen);
+            if (ret == 0)
             {
-
-                // Compute the raw shared secret (mbedTLS 3.x API)
                 uint8_t shared_secret[32];
                 size_t secret_len;
-                if (mbedtls_ecdh_calc_secret(&ecdh, &secret_len, shared_secret, sizeof(shared_secret), mbedtls_ctr_drbg_random, &ctr_drbg) == 0)
+                ret = mbedtls_ecdh_calc_secret(&ecdh, &secret_len, shared_secret, sizeof(shared_secret), mbedtls_ctr_drbg_random, &ctr_drbg);
+                if (ret == 0)
                 {
-                    // Truncate the 32-byte ECDH secret down to a 16-byte AES Key
                     memcpy(sharedEncryptionKey, shared_secret, 16);
                     isPaired = true;
                     Serial.println("Pairing SUCCESS! Shared AES key established and saved to RTC.");
                 }
                 else
                 {
-                    Serial.println("Pairing FAILED: Could not calculate shared secret.");
+                    Serial.printf("Pairing FAILED: Could not calculate shared secret. Error: -0x%04X\n", -ret);
                 }
             }
             else
             {
-                Serial.println("Pairing FAILED: Could not read peer public key.");
+                Serial.printf("Pairing FAILED: Could not read peer public key. Error: -0x%04X\n", -ret);
             }
         }
         else
@@ -471,11 +496,8 @@ private:
             Serial.println("Pairing FAILED: Timeout waiting for receiver.");
         }
 
-        // 8. Cleanup cryptography contexts
-        mbedtls_ecdh_free(&ecdh);
-        mbedtls_ctr_drbg_free(&ctr_drbg);
-        mbedtls_entropy_free(&entropy);
-
+        // 8. Cleanup cryptography contexts safely and return
+        cleanup();
         return isPaired;
     }
 
@@ -498,7 +520,7 @@ public:
 
         this->pairingButtonId = pairingButtonId;
 
-        startControllerTask("ESP-NOW Task", 4096, 1, 10);
+        startControllerTask("ESP-NOW Task", 16384, 1, 10);
     }
 
     bool initiatePairing()
@@ -514,7 +536,7 @@ public:
             {
                 break;
             }
-            else
+            else if (attempt <= pairingRetryCount)
             {
                 Serial.println("Pairing attempt failed. Retrying...");
                 vTaskDelay(pdMS_TO_TICKS(2000));
