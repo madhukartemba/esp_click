@@ -125,6 +125,25 @@ void setup()
         }
       });
 
+  EspNowController::getInstance().registerOnPairingInit(
+      []()
+      {
+        statusLed.set(LedMode::PULSE, Color::YELLOW);
+      });
+
+  EspNowController::getInstance().registerOnPairingComplete(
+      [](bool success)
+      {
+        if (success)
+        {
+          statusLed.set(LedMode::BLINK, 2, Color::GREEN);
+        }
+        else
+        {
+          statusLed.set(LedMode::BLINK, 4, Color::RED);
+        }
+      });
+
   EspNowController::getInstance().begin(BoardConfig::PAIRING_MODE_PIN);
 }
 

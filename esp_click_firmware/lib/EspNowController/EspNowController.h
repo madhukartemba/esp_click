@@ -122,8 +122,6 @@ private:
             Message message;
             if (xQueueReceive(messageQueue, &message, portMAX_DELAY))
             {
-
-                // Check if it's the pairing button triggering the message
                 if (message.type == MessageType::BUTTON_PRESS &&
                     message.data.buttonPress.buttonId == pairingButtonId)
                 {
@@ -131,18 +129,20 @@ private:
                     {
                         initiatePairing();
                     }
-                    continue;
                 }
+                else
+                {
 
-                message.counter = ++messageCounter;
+                    message.counter = ++messageCounter;
 
-                if (onBeforeSend)
-                    onBeforeSend(message);
+                    if (onBeforeSend)
+                        onBeforeSend(message);
 
-                bool success = sendMessage(&message);
+                    bool success = sendMessage(&message);
 
-                if (onAfterSend)
-                    onAfterSend(message, success);
+                    if (onAfterSend)
+                        onAfterSend(message, success);
+                }
 
                 SleepManager::getInstance().allowSleep(this->taskId);
             }
