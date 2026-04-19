@@ -103,9 +103,9 @@ void setup()
           else if (message.data.buttonPress.event == SINGLE_PRESS)
             statusLed.set(LedMode::SOLID, Color::WHITE);
           else if (message.data.buttonPress.event == DOUBLE_PRESS)
-            statusLed.set(LedMode::SOLID, Color::GREEN);
+            statusLed.set(LedMode::SOLID, Color::YELLOW);
           else if (message.data.buttonPress.event == LONG_PRESS)
-            statusLed.set(LedMode::SOLID, Color::BLUE);
+            statusLed.set(LedMode::SOLID, Color::MAGENTA);
         }
       });
 
@@ -135,7 +135,7 @@ void setup()
   EspNowController::getInstance().registerOnPairingInit(
       []()
       {
-        statusLed.set(LedMode::PULSE, Color::MAGENTA);
+        statusLed.set(LedMode::PULSE, Color::BLUE);
       });
 
   EspNowController::getInstance().registerOnPairingComplete(
