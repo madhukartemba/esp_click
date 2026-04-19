@@ -34,7 +34,7 @@ void setup()
   buttonManager.registerButton(&button2);
   buttonManager.registerButton(&button3);
   buttonManager.registerButton(&button4);
-  buttonManager.registerButton(&pairingButton);
+  buttonManager.registerButton(&pairingButton, false);
 
   buttonManager.registerMessageSink(&EspNowController::getInstance());
 

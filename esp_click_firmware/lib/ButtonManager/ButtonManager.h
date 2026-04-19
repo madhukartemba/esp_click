@@ -58,11 +58,14 @@ public:
         xTaskCreate(ButtonManager::buttonTask, "Button Manager", 2048, this, 1, NULL);
     }
 
-    void registerButton(Button *button)
+    void registerButton(Button *button, bool registerWakeupPin = true)
     {
         buttons.push_back(button);
 
-        SleepManager::getInstance().registerWakeupPin(button->getPin());
+        if (registerWakeupPin)
+        {
+            SleepManager::getInstance().registerWakeupPin(button->getPin());
+        }
 
         button->registerStateChangeCallback(
             [this](ButtonState state)
