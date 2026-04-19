@@ -43,6 +43,7 @@ namespace SessionIdHistory
     uint64_t g_ids[kMax];
     size_t g_len = 0;
 
+    // Returns whether id was recently used as a session id (RTC ring buffer).
     bool contains(uint64_t id)
     {
         for (size_t i = 0; i < g_len; i++)
@@ -53,6 +54,7 @@ namespace SessionIdHistory
         return false;
     }
 
+    // Records id as the newest session id, evicting the oldest when full.
     void push(uint64_t id)
     {
         if (g_len < kMax)
@@ -64,6 +66,7 @@ namespace SessionIdHistory
         g_ids[kMax - 1] = id;
     }
 
+    // Clears the session id history ring buffer.
     void clear()
     {
         g_len = 0;
@@ -117,6 +120,7 @@ private:
     EspNowController() {}
     ~EspNowController() {}
 
+    // After boot, assigns a unique rtcSessionId when paired; skips if unpaired.
     void initSessionIdForBoot()
     {
         if (!isPaired)
@@ -145,6 +149,7 @@ private:
         SessionIdHistory::push(rtcSessionId);
     }
 
+    // ESP-NOW RX hook: dispatches to the singleton instance (must be IRAM-safe).
     static void IRAM_ATTR binRecvCb(const esp_now_recv_info_t *info, const uint8_t *incomingData, int len)
     {
         if (s_instance)
@@ -153,6 +158,7 @@ private:
         }
     }
 
+    // Handles app ACKs (updates RSSI during discovery) and plaintext pairing responses.
     void onDataReceived(const esp_now_recv_info_t *info, const uint8_t *incomingData, int len)
     {
         Serial.println("Received ESP-NOW packet!");
@@ -196,6 +202,7 @@ private:
         }
     }
 
+    // Controller task: processes queued messages, pairing long-press, and send hooks.
     void run() override
     {
         bool initSuccessful = initEspNow();
@@ -238,14 +245,15 @@ private:
     // ==========================================
     // AES-GCM Helpers
     // ==========================================
-    // 12-byte GCM nonce: sessionId (8, LE) + counter (4, LE). Unique per (sessionId, counter) for a given key.
-    void generate_iv(uint8_t *iv, uint32_t counter, uint64_t sessionId)
+    // Builds the 12-byte GCM IV: sessionId (8 LE) + counter (4 LE).
+    void generateIv(uint8_t *iv, uint32_t counter, uint64_t sessionId)
     {
         memcpy(&iv[0], &sessionId, sizeof(sessionId));
         memcpy(&iv[8], &counter, sizeof(counter));
     }
 
-    bool encrypt_message(const Message *plaintext_msg, EncryptedPacket *out_packet)
+    // AES-GCM encrypts a Message into an EncryptedPacket using sharedEncryptionKey.
+    bool encryptMessage(const Message *plaintextMsg, EncryptedPacket *outPacket)
     {
         mbedtls_gcm_context gcm;
         mbedtls_gcm_init(&gcm);
@@ -257,18 +265,18 @@ private:
             return false;
         }
 
-        generate_iv(out_packet->iv, plaintext_msg->counter, plaintext_msg->sessionId);
+        generateIv(outPacket->iv, plaintextMsg->counter, plaintextMsg->sessionId);
 
         int ret = mbedtls_gcm_crypt_and_tag(
             &gcm,
             MBEDTLS_GCM_ENCRYPT,
             sizeof(Message),
-            out_packet->iv, AES_IV_LENGTH,
+            outPacket->iv, AES_IV_LENGTH,
             NULL, 0, // No Additional Authenticated Data (AAD) needed
-            (const unsigned char *)plaintext_msg,
-            out_packet->ciphertext,
+            (const unsigned char *)plaintextMsg,
+            outPacket->ciphertext,
             AES_TAG_LENGTH,
-            out_packet->tag);
+            outPacket->tag);
 
         mbedtls_gcm_free(&gcm);
 
@@ -281,6 +289,7 @@ private:
         return true;
     }
 
+    // Sends one encrypted Message to lastSendNode and waits for an app-level ACK.
     bool sendMessageToKnownNode(Message *message)
     {
 
@@ -315,7 +324,7 @@ private:
         appAckReceived = false;
 
         EncryptedPacket encPacket;
-        if (encrypt_message(message, &encPacket))
+        if (encryptMessage(message, &encPacket))
         {
             esp_now_send(lastSendNode.targetMAC, (uint8_t *)&encPacket, sizeof(EncryptedPacket));
         }
@@ -339,6 +348,7 @@ private:
         return ackResult;
     }
 
+    // Sweeps Wi-Fi channels with an encrypted discovery ping; picks best RSSI peer.
     bool findNodeViaBroadcast()
     {
         // STRICT GUARD: Do not allow unencrypted discovery broadcasts
@@ -376,7 +386,7 @@ private:
             expectedMessageId = pingMsg.counter;
 
             EncryptedPacket encPing;
-            if (encrypt_message(&pingMsg, &encPing))
+            if (encryptMessage(&pingMsg, &encPing))
             {
                 esp_now_send(broadcastMAC, (uint8_t *)&encPing, sizeof(EncryptedPacket));
             }
@@ -405,6 +415,7 @@ private:
         return lastSendNode.isNodeKnown;
     }
 
+    // Ensures a peer exists, then encrypts and sends with ACK (may rediscover first).
     bool sendMessage(Message *message)
     {
 
@@ -435,6 +446,7 @@ private:
         return false;
     }
 
+    // Blocks until appAckReceived or ackWaitTimeout ms elapse.
     bool waitForAck()
     {
         unsigned long start = millis();
@@ -449,6 +461,7 @@ private:
         return true;
     }
 
+    // Initializes ESP-NOW and registers the receive callback.
     bool initEspNow()
     {
         if (esp_now_init() != ESP_OK)
@@ -461,6 +474,7 @@ private:
         return true;
     }
 
+    // Loads shared key and paired flag from NVS into RTC/static state.
     void loadPairingFromPrefs()
     {
         Preferences prefs;
@@ -485,6 +499,7 @@ private:
         Serial.println("Pairing NVS: restored key");
     }
 
+    // Persists shared key and paired flag to NVS (versioned blob).
     void savePairingToPrefs()
     {
         PairingNvs::Blob blob{};
@@ -509,6 +524,7 @@ private:
         }
     }
 
+    // Removes pairing data from NVS (namespace clear).
     void clearPairingFromPrefs()
     {
         Preferences prefs;
@@ -522,6 +538,7 @@ private:
         Serial.println("Pairing NVS: cleared");
     }
 
+    // Clears NVS pairing, keys, session state, and in-memory node bookkeeping.
     void wipePairingConfig()
     {
         clearPairingFromPrefs();
@@ -536,6 +553,7 @@ private:
         messageCounter = 0;
     }
 
+    // Performs Curve25519 ECDH: broadcasts public key, completes shared AES key to NVS.
     bool pairDevice()
     {
         mbedtls_ecdh_context ecdh;
@@ -662,6 +680,7 @@ private:
     }
 
 public:
+    // Returns the process-wide singleton (Meyers').
     static EspNowController &getInstance()
     {
         static EspNowController instance;
@@ -671,6 +690,7 @@ public:
     EspNowController(const EspNowController &) = delete;
     EspNowController &operator=(const EspNowController &) = delete;
 
+    // Sets STA mode, loads pairing NVS, seeds session id, starts the controller task.
     void begin(uint8_t pairingButtonId)
     {
         WiFi.mode(WIFI_STA);
@@ -686,6 +706,7 @@ public:
         startControllerTask("ESP-NOW Task", 16384, 1, 10);
     }
 
+    // Wipes old pairing, runs ECDH with retries, invokes pairing callbacks.
     bool initiatePairing()
     {
         wipePairingConfig();
@@ -714,14 +735,21 @@ public:
         return isPaired;
     }
 
+    // True when a shared AES key exists (paired with a receiver).
     bool isDevicePaired() { return isPaired; }
 
+    // Maximum extra pairing attempts after the first (see initiatePairing loop).
     void setPairingRetryCount(uint8_t count) { pairingRetryCount = count; }
+    // Current pairing retry budget (same meaning as setPairingRetryCount).
     uint8_t getPairingRetryCount() { return pairingRetryCount; }
 
+    // Hook invoked for each outgoing message after dequeue, before encryption/send.
     void registerOnBeforeSend(std::function<void(Message)> callback) { this->onBeforeSend = callback; }
+    // Hook invoked after send attempt; bool is whether the path reported success.
     void registerOnAfterSend(std::function<void(Message, bool)> callback) { this->onAfterSend = callback; }
+    // Called once when initiatePairing starts (after wipe).
     void registerOnPairingInit(std::function<void()> callback) { this->onPairingInit = callback; }
+    // Called when pairing finishes; argument is whether pairing succeeded.
     void registerOnPairingComplete(std::function<void(bool)> callback) { this->onPairingComplete = callback; }
 };
 
