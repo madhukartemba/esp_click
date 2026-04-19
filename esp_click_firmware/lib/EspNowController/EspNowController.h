@@ -199,6 +199,12 @@ private:
             Message *msg = (Message *)incomingData;
             if (msg->type == PAIRING_RESPONSE)
             {
+
+                if(isPaired) {
+                    Serial.println("Ignoring pairing response: Device is already paired");
+                    return;
+                }
+
                 memcpy(peerPublicKey, msg->data.pairing.publicKey, msg->data.pairing.keyLen);
                 peerPublicKeyLen = msg->data.pairing.keyLen;
 
