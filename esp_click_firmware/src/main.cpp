@@ -93,22 +93,6 @@ void setup()
 
   batteryMonitor.begin();
 
-  EspNowController::getInstance().registerOnAfterSend(
-      [](Message message, bool success)
-      {
-        if (message.type == MessageType::BUTTON_PRESS)
-        {
-          if (success)
-          {
-            statusLed.set(LedMode::OFF);
-          }
-          else
-          {
-            statusLed.set(LedMode::BLINK, 2, Color::RED);
-          }
-        }
-      });
-
   EspNowController::getInstance().registerOnBeforeSend(
       [](Message message)
       {
@@ -124,6 +108,23 @@ void setup()
             statusLed.set(LedMode::SOLID, Color::BLUE);
         }
       });
+
+
+  EspNowController::getInstance().registerOnAfterSend(
+    [](Message message, bool success)
+    {
+      if (message.type == MessageType::BUTTON_PRESS)
+      {
+        if (success)
+        {
+          statusLed.set(LedMode::OFF);
+        }
+        else
+        {
+          statusLed.set(LedMode::BLINK, 2, Color::RED);
+        }
+      }
+    });
 
   EspNowController::getInstance().registerOnPairingInit(
       []()
