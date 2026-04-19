@@ -109,22 +109,28 @@ void setup()
         }
       });
 
-
   EspNowController::getInstance().registerOnAfterSend(
-    [](Message message, bool success)
-    {
-      if (message.type == MessageType::BUTTON_PRESS)
+      [](Message message, bool success)
       {
-        if (success)
+        if (message.type == MessageType::BUTTON_PRESS)
         {
-          statusLed.set(LedMode::OFF);
+          if (success)
+          {
+            statusLed.set(LedMode::OFF);
+          }
+          else
+          {
+            if (EspNowController::getInstance().isPaired())
+            {
+              statusLed.set(LedMode::BLINK, 2, Color::RED);
+            }
+            else
+            {
+              statusLed.set(LedMode::BLINK, 5, Color::RED);
+            }
+          }
         }
-        else
-        {
-          statusLed.set(LedMode::BLINK, 2, Color::RED);
-        }
-      }
-    });
+      });
 
   EspNowController::getInstance().registerOnPairingInit(
       []()
