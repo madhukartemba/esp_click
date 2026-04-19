@@ -58,3 +58,11 @@ struct __attribute__((packed)) EncryptedPacket
     uint8_t ciphertext[sizeof(Message)];
     uint8_t tag[AES_TAG_LENGTH];
 };
+
+// Hub → device ACK (paired): same AES key; IV = sessionId (8 LE) || (~counter) (4 LE), distinct from request IV.
+struct __attribute__((packed)) EncryptedAckPacket
+{
+    uint8_t iv[AES_IV_LENGTH];
+    uint8_t ciphertext[sizeof(AckMessage)];
+    uint8_t tag[AES_TAG_LENGTH];
+};

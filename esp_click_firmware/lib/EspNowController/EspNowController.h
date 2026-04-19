@@ -158,17 +158,26 @@ private:
         }
     }
 
-    // Handles app ACKs (updates RSSI during discovery) and plaintext pairing responses.
+    // Handles encrypted app ACKs (updates RSSI during discovery) and plaintext pairing responses.
     void onDataReceived(const esp_now_recv_info_t *info, const uint8_t *incomingData, int len)
     {
         Serial.println("Received ESP-NOW packet!");
-
-        // First check if it's an ACK for a message we sent
-        if (len == sizeof(AckMessage))
+        if (len == sizeof(EncryptedAckPacket) && isPaired)
         {
-            AckMessage *ack = (AckMessage *)incomingData;
+            const EncryptedAckPacket *encAck = (const EncryptedAckPacket *)incomingData;
+            AckMessage ack{};
+            if (!decryptAckPacket(encAck, &ack))
+                return;
 
-            if (ack->counter == expectedMessageId && ack->success)
+            uint8_t expectedIv[AES_IV_LENGTH];
+            buildAckIv(rtcSessionId, ack.counter, expectedIv);
+            if (memcmp(encAck->iv, expectedIv, AES_IV_LENGTH) != 0)
+            {
+                Serial.println("ACK: IV does not match session/counter");
+                return;
+            }
+
+            if (ack.counter == expectedMessageId && ack.success)
             {
                 appAckReceived = true;
 
@@ -250,6 +259,53 @@ private:
     {
         memcpy(&iv[0], &sessionId, sizeof(sessionId));
         memcpy(&iv[8], &counter, sizeof(counter));
+    }
+
+    // Hub ACK IV: sessionId (8 LE) || (~counter) (4 LE); must differ from request packet IV.
+    static void buildAckIv(uint64_t sessionId, uint32_t counter, uint8_t iv[AES_IV_LENGTH])
+    {
+        memcpy(iv, &sessionId, sizeof(sessionId));
+        uint32_t ctrFlipped = ~counter;
+        memcpy(iv + sizeof(sessionId), &ctrFlipped, sizeof(ctrFlipped));
+    }
+
+    bool decryptAckPacket(const EncryptedAckPacket *encryptedAck, AckMessage *outPlain)
+    {
+        mbedtls_gcm_context gcm;
+        mbedtls_gcm_init(&gcm);
+
+        if (mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, sharedEncryptionKey, 128) != 0)
+        {
+            Serial.println("ACK decrypt: setkey failed");
+            mbedtls_gcm_free(&gcm);
+            return false;
+        }
+
+        int ret = mbedtls_gcm_auth_decrypt(
+            &gcm,
+            sizeof(AckMessage),
+            encryptedAck->iv,
+            AES_IV_LENGTH,
+            nullptr,
+            0,
+            encryptedAck->tag,
+            AES_TAG_LENGTH,
+            encryptedAck->ciphertext,
+            (unsigned char *)outPlain);
+
+        mbedtls_gcm_free(&gcm);
+
+        if (ret == MBEDTLS_ERR_GCM_AUTH_FAILED)
+        {
+            Serial.println("ACK decrypt: GCM auth failed");
+            return false;
+        }
+        if (ret != 0)
+        {
+            Serial.printf("ACK decrypt: error -0x%04X\n", -ret);
+            return false;
+        }
+        return true;
     }
 
     // AES-GCM encrypts a Message into an EncryptedPacket using sharedEncryptionKey.
