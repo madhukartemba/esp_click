@@ -11,11 +11,21 @@ enum MessageType
     PAIRING_RESPONSE // NEW: Receiver -> Sender
 };
 
-// Application-level ACK structure MUST be packed
+enum AckReason : uint8_t
+{
+    ACK_OK = 0,
+    ACK_SESSION_ID_ZERO = 1,
+    ACK_REPLAY_COUNTER = 2,
+    ACK_SESSION_RETIRED = 3,
+};
+
+// Application-level ACK (encrypted as EncryptedAckPacket). Field order must match hub firmware.
 struct __attribute__((packed)) AckMessage
 {
     uint32_t counter;
+    uint64_t sessionId = 0;
     bool success;
+    AckReason reason = ACK_OK;
 };
 
 // Message structure MUST be packed

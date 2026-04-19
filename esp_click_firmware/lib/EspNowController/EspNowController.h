@@ -97,6 +97,7 @@ private:
     static EspNowController *s_instance;
 
     volatile bool appAckReceived = false;
+    volatile bool appAckFailed = false;
     volatile uint32_t expectedMessageId = 0;
     volatile uint8_t currentSweepChannel = 0;
     uint32_t messageCounter = 0;
@@ -149,6 +150,13 @@ private:
         SessionIdHistory::push(rtcSessionId);
     }
 
+    void rotateSessionAndResetCounterAfterHubRejection(AckReason reason)
+    {
+        Serial.printf("Hub NACK (reason=%u); new session id + counter reset\n", (unsigned)reason);
+        initSessionIdForBoot();
+        messageCounter = 0;
+    }
+
     // ESP-NOW RX hook: dispatches to the singleton instance (must be IRAM-safe).
     static void IRAM_ATTR binRecvCb(const esp_now_recv_info_t *info, const uint8_t *incomingData, int len)
     {
@@ -170,14 +178,17 @@ private:
                 return;
 
             uint8_t expectedIv[AES_IV_LENGTH];
-            buildAckIv(rtcSessionId, ack.counter, expectedIv);
+            buildAckIv(ack.sessionId, ack.counter, expectedIv);
             if (memcmp(encAck->iv, expectedIv, AES_IV_LENGTH) != 0)
             {
                 Serial.println("ACK: IV does not match session/counter");
                 return;
             }
 
-            if (ack.counter == expectedMessageId && ack.success)
+            if (ack.counter != expectedMessageId || ack.sessionId != rtcSessionId)
+                return;
+
+            if (ack.success)
             {
                 appAckReceived = true;
 
@@ -192,6 +203,11 @@ private:
                         bestFoundNode.found = true;
                     }
                 }
+            }
+            else
+            {
+                rotateSessionAndResetCounterAfterHubRejection(ack.reason);
+                appAckFailed = true;
             }
         }
         else if (len == sizeof(Message))
@@ -384,6 +400,7 @@ private:
 
         expectedMessageId = message->counter;
         appAckReceived = false;
+        appAckFailed = false;
 
         EncryptedPacket encPacket;
         if (encryptMessage(message, &encPacket))
@@ -444,6 +461,7 @@ private:
             esp_wifi_set_channel(i, WIFI_SECOND_CHAN_NONE);
             currentSweepChannel = i;
 
+            pingMsg.sessionId = rtcSessionId;
             pingMsg.counter = ++messageCounter;
             expectedMessageId = pingMsg.counter;
 
@@ -508,11 +526,11 @@ private:
         return false;
     }
 
-    // Blocks until appAckReceived or ackWaitTimeout ms elapse.
+    // Blocks until success ACK, hub NACK (session rotated), or ackWaitTimeout.
     bool waitForAck()
     {
         unsigned long start = millis();
-        while (!appAckReceived)
+        while (!appAckReceived && !appAckFailed)
         {
             vTaskDelay(pdMS_TO_TICKS(1));
             if (millis() - start > ackWaitTimeout)
@@ -520,7 +538,7 @@ private:
                 return false;
             }
         }
-        return true;
+        return !appAckFailed;
     }
 
     // Initializes ESP-NOW and registers the receive callback.
