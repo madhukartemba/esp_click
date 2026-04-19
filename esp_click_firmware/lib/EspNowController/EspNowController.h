@@ -63,6 +63,12 @@ namespace SessionIdHistory
         memmove(g_ids, g_ids + 1, (kMax - 1) * sizeof(uint64_t));
         g_ids[kMax - 1] = id;
     }
+
+    void clear()
+    {
+        g_len = 0;
+        memset(g_ids, 0, sizeof(g_ids));
+    }
 } // namespace SessionIdHistory
 
 // NVS: AES key + paired flag only; saved once when pairing succeeds
@@ -503,6 +509,33 @@ private:
         }
     }
 
+    void clearPairingFromPrefs()
+    {
+        Preferences prefs;
+        if (!prefs.begin(PairingNvs::kNs, false))
+        {
+            Serial.println("Pairing NVS: failed to open namespace for clear");
+            return;
+        }
+        prefs.clear();
+        prefs.end();
+        Serial.println("Pairing NVS: cleared");
+    }
+
+    void wipePairingConfig()
+    {
+        clearPairingFromPrefs();
+        memset(sharedEncryptionKey, 0, sizeof(sharedEncryptionKey));
+        isPaired = false;
+        rtcSessionId = 0;
+        SessionIdHistory::clear();
+
+        lastSendNode = LastSendNode{};
+        bestFoundNode = BestNode{{0}, 0, -127, false};
+
+        messageCounter = 0;
+    }
+
     bool pairDevice()
     {
         mbedtls_ecdh_context ecdh;
@@ -655,6 +688,8 @@ public:
 
     bool initiatePairing()
     {
+        wipePairingConfig();
+
         Serial.println("Initiating ECDH Key Exchange...");
         if (onPairingInit)
             onPairingInit();
