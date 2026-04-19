@@ -789,6 +789,16 @@ public:
     // Wipes old pairing, runs ECDH with retries, invokes pairing callbacks.
     bool initiatePairing()
     {
+        if (isPaired)
+        {
+            Message unpair{};
+            unpair.type = UNPAIR_REQUEST;
+            unpair.deviceId = 0;
+            Serial.println("Sending UNPAIR_REQUEST to hub (if reachable)...");
+            if (!sendMessage(&unpair))
+                Serial.println("UNPAIR_REQUEST failed or no ACK; continuing to wipe and re-pair.");
+        }
+
         wipePairingConfig();
 
         Serial.println("Initiating ECDH Key Exchange...");

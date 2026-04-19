@@ -7,8 +7,9 @@ enum MessageType
     BUTTON_PRESS,
     BATTERY_STATUS,
     DISCOVERY_REQUEST,
-    PAIRING_REQUEST, // NEW: Sender -> Receiver
-    PAIRING_RESPONSE // NEW: Receiver -> Sender
+    PAIRING_REQUEST,
+    PAIRING_RESPONSE,
+    UNPAIR_REQUEST,
 };
 
 enum AckReason : uint8_t
