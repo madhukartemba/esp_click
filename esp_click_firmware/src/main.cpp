@@ -120,7 +120,7 @@ void setup()
           }
           else
           {
-            if (EspNowController::getInstance().isPaired())
+            if (EspNowController::getInstance().isDevicePaired())
             {
               statusLed.set(LedMode::BLINK, 2, Color::RED);
             }

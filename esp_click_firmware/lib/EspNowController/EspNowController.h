@@ -714,7 +714,7 @@ public:
         return isPaired;
     }
 
-    bool isPaired() { return isPaired; }
+    bool isDevicePaired() { return isPaired; }
 
     void setPairingRetryCount(uint8_t count) { pairingRetryCount = count; }
     uint8_t getPairingRetryCount() { return pairingRetryCount; }
