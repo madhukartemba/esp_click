@@ -115,6 +115,7 @@ private:
     std::function<void(Message, bool)> onAfterSend = nullptr;
     std::function<void()> onPairingInit = nullptr;
     std::function<void(bool)> onPairingComplete = nullptr;
+    std::function<void()> onUnpairComplete = nullptr;
 
     uint8_t pairingButtonId = -1;
 
@@ -216,7 +217,8 @@ private:
             if (msg->type == PAIRING_RESPONSE)
             {
 
-                if(isPaired) {
+                if (isPaired)
+                {
                     Serial.println("Ignoring pairing response: Device is already paired");
                     return;
                 }
@@ -254,7 +256,15 @@ private:
                 {
                     if (message.data.buttonPress.event == LONG_PRESS)
                     {
-                        initiatePairing();
+
+                        if (isPaired)
+                        {
+                            unpairDevice();
+                        }
+                        else
+                        {
+                            initiatePairing();
+                        }
                     }
                 }
                 else
@@ -633,6 +643,27 @@ private:
         messageCounter = 0;
     }
 
+    bool unpairDevice()
+    {
+        Message unpair{};
+        unpair.type = UNPAIR_REQUEST;
+        unpair.deviceId = 0;
+        Serial.println("Sending UNPAIR_REQUEST to hub (if reachable)...");
+        bool res = sendMessage(&unpair);
+
+        if (!res)
+        {
+            Serial.println("UNPAIR_REQUEST failed or no ACK; continuing to wipe and re-pair.");
+        }
+
+        wipePairingConfig();
+
+        if (onUnpairComplete)
+            onUnpairComplete();
+
+        return res;
+    }
+
     // Performs Curve25519 ECDH: broadcasts public key, completes shared AES key to NVS.
     bool pairDevice()
     {
@@ -786,19 +817,9 @@ public:
         startControllerTask("ESP-NOW Task", 16384, 1, 10);
     }
 
-    // Wipes old pairing, runs ECDH with retries, invokes pairing callbacks.
+    // Runs ECDH with retries, invokes pairing callbacks.
     bool initiatePairing()
     {
-        if (isPaired)
-        {
-            Message unpair{};
-            unpair.type = UNPAIR_REQUEST;
-            unpair.deviceId = 0;
-            Serial.println("Sending UNPAIR_REQUEST to hub (if reachable)...");
-            if (!sendMessage(&unpair))
-                Serial.println("UNPAIR_REQUEST failed or no ACK; continuing to wipe and re-pair.");
-        }
-
         wipePairingConfig();
 
         Serial.println("Initiating ECDH Key Exchange...");
@@ -841,6 +862,8 @@ public:
     void registerOnPairingInit(std::function<void()> callback) { this->onPairingInit = callback; }
     // Called when pairing finishes; argument is whether pairing succeeded.
     void registerOnPairingComplete(std::function<void(bool)> callback) { this->onPairingComplete = callback; }
+    // Called when unpairing is completed.
+    void registerOnUnpairComplete(std::function<void()> callback) { this->onUnpairComplete = callback; }
 };
 
 EspNowController *EspNowController::s_instance = nullptr;

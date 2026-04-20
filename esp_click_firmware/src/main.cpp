@@ -151,6 +151,12 @@ void setup()
         }
       });
 
+  EspNowController::getInstance().registerOnUnpairComplete(
+      []()
+      {
+        statusLed.set(LedMode::BLINK, 3, Color::WHITE);
+      });
+
   EspNowController::getInstance().begin(BoardConfig::PAIRING_MODE_PIN);
 }
 
