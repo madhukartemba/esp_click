@@ -119,6 +119,21 @@ private:
 
     uint8_t pairingButtonId = -1;
 
+    volatile bool pairingInProgress = false;
+
+    // After a failed pairing cycle, ignore auto-pair from normal buttons until this time (ms).
+    // Pairing-button long-press always retries. Cleared when pairing succeeds.
+    unsigned long suppressAutoPairingUntilMs = 0;
+
+    struct PairingInProgressScope
+    {
+        volatile bool *flag;
+        explicit PairingInProgressScope(volatile bool *f) : flag(f) { *flag = true; }
+        ~PairingInProgressScope() { *flag = false; }
+        PairingInProgressScope(const PairingInProgressScope &) = delete;
+        PairingInProgressScope &operator=(const PairingInProgressScope &) = delete;
+    };
+
     EspNowController() {}
     ~EspNowController() {}
 
@@ -235,6 +250,17 @@ private:
         }
     }
 
+    // Drops any messages already waiting in the queue (e.g. extra button presses that
+    // would each trigger pairing). Call before starting a single pairing cycle.
+    void drainPendingMessages()
+    {
+        Message discard;
+        while (messageQueue != nullptr &&
+               xQueueReceive(messageQueue, &discard, 0) == pdTRUE)
+        {
+        }
+    }
+
     // Controller task: processes queued messages, pairing long-press, and send hooks.
     void run() override
     {
@@ -267,7 +293,7 @@ private:
                         }
                     }
                 }
-                else
+                else if (isPaired)
                 {
                     if (onBeforeSend)
                         onBeforeSend(message);
@@ -276,6 +302,11 @@ private:
 
                     if (onAfterSend)
                         onAfterSend(message, success);
+                }
+                else if (message.type == MessageType::BUTTON_PRESS &&
+                         millis() >= suppressAutoPairingUntilMs)
+                {
+                    initiatePairing();
                 }
 
                 SleepManager::getInstance().allowSleep(this->taskId);
@@ -820,6 +851,15 @@ public:
     // Runs ECDH with retries, invokes pairing callbacks.
     bool initiatePairing()
     {
+        if (pairingInProgress)
+        {
+            Serial.println("Pairing already in progress; ignoring duplicate request.");
+            return isPaired;
+        }
+        PairingInProgressScope pairingScope(&pairingInProgress);
+
+        drainPendingMessages();
+
         wipePairingConfig();
 
         Serial.println("Initiating ECDH Key Exchange...");
@@ -842,6 +882,18 @@ public:
 
         if (onPairingComplete)
             onPairingComplete(isPaired);
+
+        // Drop anything queued while pairing ran (button task keeps posting during ECDH/sweeps).
+        drainPendingMessages();
+
+        if (!isPaired)
+        {
+            suppressAutoPairingUntilMs = millis() + 2500;
+        }
+        else
+        {
+            suppressAutoPairingUntilMs = 0;
+        }
 
         return isPaired;
     }
