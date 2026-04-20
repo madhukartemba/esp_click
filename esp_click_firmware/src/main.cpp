@@ -143,7 +143,7 @@ void setup()
       {
         if (success)
         {
-          statusLed.set(LedMode::BLINK, 2, Color::GREEN);
+          statusLed.set(LedMode::BLINK, 3, Color::GREEN);
         }
         else
         {
@@ -152,9 +152,16 @@ void setup()
       });
 
   EspNowController::getInstance().registerOnUnpairComplete(
-      []()
+      [](bool success)
       {
-        statusLed.set(LedMode::BLINK, 3, Color::WHITE);
+        if (success)
+        {
+          statusLed.set(LedMode::BLINK, 3, Color::WHITE);
+        }
+        else
+        {
+          statusLed.set(LedMode::BLINK, 4, Color::WHITE);
+        }
       });
 
   EspNowController::getInstance().begin(BoardConfig::PAIRING_MODE_PIN);

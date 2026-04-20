@@ -115,7 +115,7 @@ private:
     std::function<void(Message, bool)> onAfterSend = nullptr;
     std::function<void()> onPairingInit = nullptr;
     std::function<void(bool)> onPairingComplete = nullptr;
-    std::function<void()> onUnpairComplete = nullptr;
+    std::function<void(bool)> onUnpairComplete = nullptr;
 
     uint8_t pairingButtonId = -1;
 
@@ -659,7 +659,7 @@ private:
         wipePairingConfig();
 
         if (onUnpairComplete)
-            onUnpairComplete();
+            onUnpairComplete(res);
 
         return res;
     }
@@ -863,7 +863,7 @@ public:
     // Called when pairing finishes; argument is whether pairing succeeded.
     void registerOnPairingComplete(std::function<void(bool)> callback) { this->onPairingComplete = callback; }
     // Called when unpairing is completed.
-    void registerOnUnpairComplete(std::function<void()> callback) { this->onUnpairComplete = callback; }
+    void registerOnUnpairComplete(std::function<void(bool)> callback) { this->onUnpairComplete = callback; }
 };
 
 EspNowController *EspNowController::s_instance = nullptr;
