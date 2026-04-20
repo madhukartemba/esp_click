@@ -156,11 +156,11 @@ void setup()
       {
         if (success)
         {
-          statusLed.set(LedMode::BLINK, 3, Color::WHITE);
+          statusLed.set(LedMode::BLINK, 3, Color::MAGENTA);
         }
         else
         {
-          statusLed.set(LedMode::BLINK, 4, Color::WHITE);
+          statusLed.set(LedMode::BLINK, 4, Color::MAGENTA);
         }
       });
 
