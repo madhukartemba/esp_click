@@ -24,4 +24,7 @@ namespace BoardConfig
     // Pairing Mode Pin
     constexpr uint8_t PAIRING_MODE_PIN = 9; // GPIO9 is used to trigger pairing mode on boot when held LOW
 
+    // Sleep Timeout
+    constexpr unsigned long SLEEP_TIMEOUT = 1000; // 1 second
+
 }

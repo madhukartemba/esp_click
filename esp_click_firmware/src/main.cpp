@@ -29,6 +29,7 @@ void setup()
 {
   Serial.begin(9600);
   SleepManager::getInstance().begin();
+  SleepManager::getInstance().setSleepTimeout(BoardConfig::SLEEP_TIMEOUT);
 
   buttonManager.registerButton(&button1);
   buttonManager.registerButton(&button2);
