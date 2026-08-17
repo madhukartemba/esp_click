@@ -20,21 +20,48 @@ private:
     unsigned long pressTimer = 0;
     unsigned long longPressDuration = 1000; // Duration to consider a long press (in milliseconds)
     unsigned long doublePressGap = 250;     // Max gap between presses for a double press (in milliseconds)
+    unsigned long debounceMs = 60;          // Pin must be stable this long before a press/release is accepted
+    unsigned long debounceTimer = 0;
+
+    bool lastRawPressed = false;
+    bool debouncedPressed = false;
 
     std::function<void(ButtonState)> stateChangeCallback;
 
+    void updateDebounce()
+    {
+        bool rawPressed = isActive();
+        unsigned long now = millis();
+
+        if (rawPressed != lastRawPressed)
+        {
+            lastRawPressed = rawPressed;
+            debounceTimer = now;
+        }
+
+        if ((now - debounceTimer) >= debounceMs)
+        {
+            debouncedPressed = lastRawPressed;
+        }
+    }
+
     bool isButtonPressed()
     {
-        return isActive();
+        return debouncedPressed;
     }
 
 public:
     Button(int pin, uint8_t mode, bool flipped = false) : DigitalInput(pin, mode, flipped)
     {
+        lastRawPressed = isActive();
+        debouncedPressed = lastRawPressed;
+        debounceTimer = millis();
     }
 
     void update()
     {
+        updateDebounce();
+
         switch (state)
         {
         case IDLE:
@@ -109,6 +136,11 @@ public:
     void setDoublePressGap(unsigned long gap)
     {
         doublePressGap = gap;
+    }
+
+    void setDebounceDuration(unsigned long duration)
+    {
+        debounceMs = duration;
     }
 
     void registerStateChangeCallback(std::function<void(ButtonState)> callback)
